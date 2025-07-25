@@ -2,21 +2,32 @@ name: Deploy to EC2
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  deploy:
+  test-ssh:
     runs-on: ubuntu-latest
     steps:
-    - name: SSH to EC2 and deploy
-      uses: appleboy/ssh-action@v0.1.10
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ubuntu
-        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        script: |
-          cd ~/bid-limit-app
-          git pull origin main
-          npm install
-          pm2 restart bid-limit
+      - name: Test SSH connection
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: echo "SSH to EC2 succeeded!"
+
+  deploy:
+    needs: test-ssh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy app
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/bid-limit-app
+            git pull origin main
+            npm install
+            pm2 restart bid-limit
