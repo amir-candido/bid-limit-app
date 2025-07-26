@@ -1,13 +1,9 @@
-const axios = require('axios');
 const db = require('./db');
-const { BIDJS_BASE, API_KEY } = require('./config');
+const bidjsClient = require('./bidjsClient');
 
 async function enforceLimitsForAuction(auctionUuid) {
   // 1) Fetch the Auction Report
-  const resp = await axios.get(
-    `${BIDJS_BASE}/auctions/${auctionUuid}/report`,
-    { headers: { Authorization: `Bearer ${API_KEY}` } }
-  );
+  const resp = await bidjsClient.get(`/auctions/${auctionUuid}/report`);
   const report = resp.data;
 
   // 2) Sum winning bids per registrant
@@ -21,6 +17,7 @@ async function enforceLimitsForAuction(auctionUuid) {
   for (let reg of regs) {
     const total = totals[reg.registrantUuid] || 0;
     const overLimit = reg.bidLimit !== null && total > reg.bidLimit;
+
     // Update DB record
     await db.upsert({
       auctionUuid,
@@ -33,17 +30,13 @@ async function enforceLimitsForAuction(auctionUuid) {
 
     // 4) Call BidJS Registrant API if status changed
     if (overLimit && !reg.paused) {
-      await axios.patch(
-        `${BIDJS_BASE}/registrants/${reg.registrantUuid}`,
-        { status: 'DepositRequested' },
-        { headers: { Authorization: `Bearer ${API_KEY}` } }
-      );
+      await bidjsClient.patch(`/registrants/${reg.registrantUuid}`, {
+        status: 'DepositRequested',
+      });
     } else if (!overLimit && reg.paused) {
-      await axios.patch(
-        `${BIDJS_BASE}/registrants/${reg.registrantUuid}`,
-        { status: 'Active' },
-        { headers: { Authorization: `Bearer ${API_KEY}` } }
-      );
+      await bidjsClient.patch(`/registrants/${reg.registrantUuid}`, {
+        status: 'Active',
+      });
     }
   }
 }
