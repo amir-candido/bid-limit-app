@@ -30,4 +30,4 @@ jobs:
             cd ~/bid-limit-app
             git pull origin main
             npm install
-            pm2 restart bid-limit
+            pm2 start src/index.js --name bid-limit --update-env
