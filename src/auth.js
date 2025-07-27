@@ -4,11 +4,16 @@ const { API_KEY, Client_ID, API_SECRET } = require('./config');
 
 function getBidJsSignature() {
   const stringToSign = `bdxapikey=${API_KEY}&bdxapiClientId=${Client_ID}&bdxapisecret=${API_SECRET}`;
-
-  return crypto
+ 
+  const signature = crypto
     .createHash('sha1')
     .update(stringToSign, 'utf8')
     .digest('hex');
+
+  console.log('Generated Signature:', signature); 
+
+  return signature;
+
 }
 
 module.exports = { getBidJsSignature };
