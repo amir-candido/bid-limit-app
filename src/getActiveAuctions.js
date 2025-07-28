@@ -6,7 +6,10 @@ async function fetchActiveAuctions() {
   try {
     const { data } = await bidjsClient.get(`${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`);
 
-    //console.log("Raw collection:", data.models.auctionReferenceModel.collection);
+    console.log("Raw data:", data);
+    console.log("Raw data.models:", data.models);
+    console.log("Raw data.models.auctionReferenceModel:", data.models.auctionReferenceModel);
+    console.log("Raw data.models.auctionReferenceModel.collection:", data.models.auctionReferenceModel.collection);
     // Drill down to the actual array:
     const auctions = data.models?.auctionReferenceModel?.collection || [];
     //console.log("All auctions:", auctions);
@@ -19,7 +22,7 @@ async function fetchActiveAuctions() {
     // Return only the IDs (or uuids if you prefer):
     return active.map(a => a.id);
   } catch (err) {
-    console.error('❌ Failed to fetch active auctions:', err.message);
+    console.error('getActiveAuctions.js: Failed to fetch active auctions:', err.message);
     return [];
   }
 }
