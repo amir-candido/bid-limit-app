@@ -1,16 +1,23 @@
 
-const { BIDJS_BASE, API_KEY } = require('./config');
+const { BIDJS_BASE, Client_ID, Auctioneer_ID } = require('./config');
 const bidjsClient = require('./bidjsClient');
 
 async function fetchActiveAuctions() {
   try {
-    const response = await bidjsClient.get(`${BIDJS_BASE}/api/auctions`);
+    const { data } = await bidjsClient.get(`${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`);
 
-    // Filter for active auctions if needed
-    const activeAuctions = response.data.auctions?.filter(a => a.status === 'active') || [];
+    //console.log("Raw collection:", data.models.auctionReferenceModel.collection);
+    // Drill down to the actual array:
+    const auctions = data.models?.auctionReferenceModel?.collection || [];
+    //console.log("All auctions:", auctions);
 
-    // Return only the IDs
-    return activeAuctions.map(a => a.id);
+    // If your goal is to only run on currently live auctions:
+    const active = auctions.filter(a => a.live);
+
+    //console.log("Filtered live auctions:", active);
+
+    // Return only the IDs (or uuids if you prefer):
+    return active.map(a => a.id);
   } catch (err) {
     console.error('❌ Failed to fetch active auctions:', err.message);
     return [];
