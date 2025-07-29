@@ -6,9 +6,7 @@ async function fetchActiveAuctions() {
   try {
     const { data } = await bidjsClient.get(`${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`);
 
-    console.log("Raw data:", data);
-    console.log("Raw data.models:", data.models);
-    console.log("Raw data.models.auctionReferenceModel:", data.models.auctionReferenceModel);
+
     console.log("Raw data.models.auctionReferenceModel.collection:", data.models.auctionReferenceModel.collection);
     // Drill down to the actual array:
     const auctions = data.models?.auctionReferenceModel?.collection || [];

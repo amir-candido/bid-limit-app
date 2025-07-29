@@ -6,6 +6,8 @@ const router = express.Router();
 // List all registrants for an auction
 router.get('/:auctionUuid/limits', async (req, res) => {
   const data = await db.getAllForAuction(req.params.auctionUuid);
+  console.log('data......');
+  console.log(data);
   res.json(data);
 });
 

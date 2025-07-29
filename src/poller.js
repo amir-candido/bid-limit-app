@@ -4,12 +4,13 @@ const { enforceLimitsForAuction } = require('./services');
 
 async function startScheduler() {
   const activeAuctionIds = await fetchActiveAuctions();
-  console.log('poller.js: Active Auctions:', activeAuctionIds);
+  //console.log('poller.js: Active Auctions:', activeAuctionIds);
 
   // every minute
   schedule.scheduleJob('*/1 * * * *', async () => {
     for (const auctionId of activeAuctionIds) {
       try {
+        console.log(`Calling schedule.scheduleJob...`);
         await enforceLimitsForAuction(auctionId);
       } catch (err) {
         console.error(`Error polling auction ${auctionId}:`, err);
