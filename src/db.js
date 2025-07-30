@@ -7,7 +7,7 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS registrants (
       auctionId TEXT,
       userId TEXT,
-      bidLimit INTEGER,      
+      bidLimit INTEGER,
       currentTotal INTEGER,
       paused INTEGER DEFAULT 0,
       updatedAt TEXT,
@@ -17,7 +17,6 @@ db.serialize(() => {
 });
 
 module.exports = {
-  
   getAllForAuction(auc) {
     return new Promise((resolve, reject) => {
       db.all(
@@ -61,20 +60,31 @@ module.exports = {
         [],
         (err, rows) => {
           if (err) return reject(err);
-          // rows is like [ { auctionId: '8095' }, { auctionId: '8123' }, … ]
-          const auctions = rows.map(r => r.auctionId);
-          resolve(auctions);
+          resolve(rows.map(r => r.auctionId));
         }
       );
     });
   },
-},  
 
   markPaused(auc, regUuid) {
-    return this.upsert({ auctionId: auc, userId: regUuid, paused: true, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
+    return this.upsert({
+      auctionId: auc,
+      userId: regUuid,
+      paused: true,
+      bidLimit: null,
+      currentTotal: 0,
+      updatedAt: new Date().toISOString(), 
+    });
   },
 
   markUnpaused(auc, regUuid) {
-    return this.upsert({ auctionId: auc, userId: regUuid, paused: false, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
+    return this.upsert({
+      auctionId: auc,
+      userId: regUuid,
+      paused: false,
+      bidLimit: null,
+      currentTotal: 0,
+      updatedAt: new Date().toISOString(),
+    });
   },
 };
