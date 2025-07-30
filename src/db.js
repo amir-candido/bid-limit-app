@@ -1,7 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 
 // Open (or create) the SQLite database file
-const db = new sqlite3.Database('./bidlimit.db', err => {
+db = new sqlite3.Database('./bidlimit.db', err => {
   if (err) {
     console.error('Failed to open database:', err.message);
     process.exit(1);
@@ -12,12 +12,15 @@ const db = new sqlite3.Database('./bidlimit.db', err => {
 const initSchema = () => {
   const createTableSql = `
     CREATE TABLE IF NOT EXISTS registrants (
-      auctionId    TEXT       NOT NULL,
-      userId       TEXT       NOT NULL,
-      bidLimit     INTEGER,
-      currentTotal INTEGER    DEFAULT 0,
-      paused       INTEGER    DEFAULT 0,
-      updatedAt    TEXT       NOT NULL,
+      auctionId     TEXT       NOT NULL,
+      auctionUuid   TEXT,
+      userId        TEXT       NOT NULL,
+      fullname      TEXT,
+      email         TEXT,
+      bidLimit      INTEGER,
+      currentTotal  INTEGER    DEFAULT 0,
+      paused        INTEGER    DEFAULT 0,
+      updatedAt     TEXT       NOT NULL,
       PRIMARY KEY (auctionId, userId)
     )
   `;
@@ -41,7 +44,8 @@ module.exports = {
   getAllForAuction(auctionId) {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT * FROM registrants WHERE auctionId = ?`,
+        `SELECT auctionId, auctionUuid, userId, fullname, email, bidLimit, currentTotal, paused, updatedAt
+         FROM registrants WHERE auctionId = ?`,
         [auctionId],
         (err, rows) => (err ? reject(err) : resolve(rows))
       );
@@ -56,9 +60,12 @@ module.exports = {
     return new Promise((resolve, reject) => {
       const sql = `
         INSERT INTO registrants
-          (auctionId, userId, bidLimit, currentTotal, paused, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (auctionId, auctionUuid, userId, fullname, email, bidLimit, currentTotal, paused, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(auctionId, userId) DO UPDATE SET
+          auctionUuid  = excluded.auctionUuid,
+          fullname     = excluded.fullname,
+          email        = excluded.email,
           bidLimit     = excluded.bidLimit,
           currentTotal = excluded.currentTotal,
           paused       = excluded.paused,
@@ -69,7 +76,10 @@ module.exports = {
         sql,
         [
           rec.auctionId,
+          rec.auctionUuid || null,
           rec.userId,
+          rec.fullname || null,
+          rec.email || null,
           rec.bidLimit,
           rec.currentTotal,
           rec.paused ? 1 : 0,
@@ -104,6 +114,9 @@ module.exports = {
     return this.upsert({
       auctionId,
       userId,
+      auctionUuid: null,
+      fullname: null,
+      email: null,
       bidLimit: null,
       currentTotal: 0,
       paused: true,
@@ -118,6 +131,9 @@ module.exports = {
     return this.upsert({
       auctionId,
       userId,
+      auctionUuid: null,
+      fullname: null,
+      email: null,
       bidLimit: null,
       currentTotal: 0,
       paused: false,
