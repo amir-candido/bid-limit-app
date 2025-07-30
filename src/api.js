@@ -6,17 +6,15 @@ const router = express.Router();
 // List all registrants for an auction
 router.get('/:auctionUuid/limits', async (req, res) => {
   const data = await db.getAllForAuction(req.params.auctionUuid);
-  console.log('data......');
-  console.log(data);
   res.json(data);
 });
 
 // Update a registrant’s bidLimit
-router.patch('/:auctionUuid/registrants/:registrantUuid', express.json(), async (req, res) => {
+router.patch('/:auctionUuid/registrants/:userId', express.json(), async (req, res) => {
   const bidLimit = req.body.bidLimit;  // integer or null
   await db.upsert({
     auctionUuid: req.params.auctionUuid,
-    registrantUuid: req.params.registrantUuid,
+    userId: req.params.userId,
     bidLimit,
     currentTotal: 0,
     paused: false,

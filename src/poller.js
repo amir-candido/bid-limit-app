@@ -1,19 +1,17 @@
 const schedule = require('node-schedule');
-const fetchActiveAuctions = require('./getActiveAuctions');
+const {  fetchAllAuctionUUIDs }= require('./getAuctions');
 const { enforceLimitsForAuction } = require('./services');
 
 async function startScheduler() {
-  const activeAuctionIds = await fetchActiveAuctions();
-  //console.log('poller.js: Active Auctions:', activeAuctionIds);
 
-  // every minute
+  const allAuctionUUID = await fetchAllAuctionUUIDs();
+
   schedule.scheduleJob('*/1 * * * *', async () => {
-    for (const auctionId of activeAuctionIds) {
+    for (const auctionUUId of allAuctionUUID) {
       try {
-        console.log(`Calling schedule.scheduleJob...`);
-        await enforceLimitsForAuction(auctionId);
+        await enforceLimitsForAuction(auctionUUId);
       } catch (err) {
-        console.error(`Error polling auction ${auctionId}:`, err);
+        console.error(`Error polling auction ${auctionUUId}:`, err);
       }
     }
   });

@@ -6,12 +6,12 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS registrants (
       auctionUuid TEXT,
-      registrantUuid TEXT,
+      userId TEXT,
       bidLimit INTEGER,     -- NULL = unlimited
       currentTotal INTEGER,
       paused INTEGER DEFAULT 0,
       updatedAt TEXT,
-      PRIMARY KEY (auctionUuid, registrantUuid)
+      PRIMARY KEY (auctionUuid, userId)
     )
   `);
 });
@@ -31,16 +31,16 @@ module.exports = {
     return new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO registrants
-           (auctionUuid, registrantUuid, bidLimit, currentTotal, paused, updatedAt)
+           (auctionUuid, userId, bidLimit, currentTotal, paused, updatedAt)
          VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(auctionUuid, registrantUuid) DO UPDATE SET
+         ON CONFLICT(auctionUuid, userId) DO UPDATE SET
            bidLimit=excluded.bidLimit,
            currentTotal=excluded.currentTotal,
            paused=excluded.paused,
            updatedAt=excluded.updatedAt`,
         [
           rec.auctionUuid,
-          rec.registrantUuid,
+          rec.userId,
           rec.bidLimit,
           rec.currentTotal,
           rec.paused ? 1 : 0,
@@ -52,10 +52,10 @@ module.exports = {
   },
 
   markPaused(auc, regUuid) {
-    return this.upsert({ auctionUuid: auc, registrantUuid: regUuid, paused: true, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
+    return this.upsert({ auctionUuid: auc, userId: regUuid, paused: true, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
   },
 
   markUnpaused(auc, regUuid) {
-    return this.upsert({ auctionUuid: auc, registrantUuid: regUuid, paused: false, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
+    return this.upsert({ auctionUuid: auc, userId: regUuid, paused: false, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
   },
 };
