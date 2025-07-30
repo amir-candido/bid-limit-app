@@ -7,7 +7,7 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS registrants (
       auctionUuid TEXT,
       userId TEXT,
-      bidLimit INTEGER,     -- NULL = unlimited
+      bidLimit INTEGER,      
       currentTotal INTEGER,
       paused INTEGER DEFAULT 0,
       updatedAt TEXT,

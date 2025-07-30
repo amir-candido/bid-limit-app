@@ -1,3 +1,4 @@
+// src/service.js
 const db = require('./db');
 const bidjsClient = require('./bidjsClient');
 
@@ -6,67 +7,83 @@ async function enforceLimitsForAuction(auctionUuid) {
 
   // 1) Fetch the Auction Report
   console.log(`📡 Fetching auction report for ${auctionUuid}...`);
-  const resp = await bidjsClient.get(`/auction-mgt/bdxapi/reporting/auction/${auctionUuid}/category?clientId=411`);
+  const resp = await bidjsClient.get(
+    `/auction-mgt/bdxapi/reporting/auction/${auctionUuid}/category?clientId=411`
+  );
   const items = resp.data?.models?.auctionReport?.items || [];
-
   console.log(`✅ Retrieved ${items.length} items from auction report`);
 
-  // 2) Sum winning bids per userId
-  const totals = {}; // key: userId, value: number of lots won
-  console.log(`\n📊 Processing winning items...`);
+  // 2) Build totals & collect all seen registrants
+  const totals = {};        // userId -> wins count
+  const seen = {};          // userId -> true
+  console.log(`\n📊 Processing items...`);
   for (const item of items) {
-    const winner = item.winner;
-    if (winner && winner.userId) {
-      const userId = winner.userId;
-      totals[userId] = (totals[userId] || 0) + 1;
-      console.log(`🏅 Lot ${item.lotNumber} won by userId ${userId} — total wins so far: ${totals[userId]}`);
-    } 
+    // Winner
+    const w = item.winner;
+    if (w && w.userId) {
+      seen[w.userId] = true;
+      totals[w.userId] = (totals[w.userId] || 0) + 1;
+      console.log(`🏅 Lot ${item.lotNumber} won by userId ${w.userId}`);
+    }
+    // Losers (to seed them in DB with zero wins)
+    if (Array.isArray(item.losers)) {
+      for (const l of item.losers) {
+        if (l.userId) {
+          seen[l.userId] = true;
+        }
+      }
+    }
+  }
+  console.log(`\n📁 Winning totals:`, totals);
+  console.log(`👥 Total registrants seen: ${Object.keys(seen).length}`);
+
+  // 3) Seed DB: upsert every seen userId with its currentTotal
+  console.log(`\n💾 Seeding DB with registrants & their win counts...`);
+  const now = new Date().toISOString();
+  for (const userId of Object.keys(seen)) {
+    // fetch existing record to preserve bidLimit & paused flag
+    const [existing] = await db.getAllForAuction(auctionUuid)
+      .then(rows => rows.filter(r => r.userId === userId));
+
+    await db.upsert({
+      auctionUuid,
+      userId,
+      bidLimit: existing ? existing.bidLimit : null,
+      currentTotal: totals[userId] || 0,
+      paused: existing ? existing.paused : false,
+      updatedAt: now,
+    });
+    console.log(`   🔄 Upserted userId ${userId} (wins=${totals[userId] || 0})`);
   }
 
-  console.log(`\n📁 Winning totals:`, totals);
-
-  // 3) Fetch all registrants from DB for this auction
-  console.log(`\n🗃️ Fetching registered bidders from DB for auction ${auctionUuid}...`);
+  // 4) Fetch all registrants now in DB
+  console.log(`\n🗃️ Fetching registrants from DB for auction ${auctionUuid}...`);
   const regs = await db.getAllForAuction(auctionUuid);
   console.log(`✅ Found ${regs.length} registrants in DB.`);
 
-  // 4) Evaluate and enforce limits
-  for (let reg of regs) {
-    const currentTotal = totals[reg.userId] || 0;
-    const overLimit = reg.bidLimit !== null && currentTotal >= reg.bidLimit;
+  // 5) Enforce limits via BidJS API
+  for (const reg of regs) {
+    const total = reg.currentTotal;
+    const overLimit = reg.bidLimit !== null && total >= reg.bidLimit;
 
     console.log(`\n👤 Checking userId ${reg.userId}`);
     console.log(`   - Bid limit: ${reg.bidLimit === null ? 'Unlimited' : reg.bidLimit}`);
-    console.log(`   - Current wins: ${currentTotal}`);
+    console.log(`   - CurrentTotal: ${total}`);
     console.log(`   - Previously paused: ${!!reg.paused}`);
-    console.log(`   - Over limit? ${overLimit ? 'YES' : 'NO'}`);
+    console.log(`   - Over limit? ${overLimit}`);
 
-    // Update DB
-    await db.upsert({
-      auctionUuid,
-      userId: reg.userId,
-      bidLimit: reg.bidLimit,
-      currentTotal,
-      paused: overLimit,
-      updatedAt: new Date().toISOString(),
-    });
-    console.log(`   📥 Updated DB record for userId ${reg.userId}`);
-
-    // 5) Call BidJS API if status needs to change
-    if (overLimit && !reg.paused) {
-      console.log(`   🚫 Pausing userId ${reg.userId} via BidJS API...`);
-      await bidjsClient.patch(`/v2/auctions/${auctionUuid}/registrants/${reg.userId}`, {
-        status: 'DepositRequested',
-      });
-      console.log(`   ✅ Paused userId ${reg.userId}`);
-    } else if (!overLimit && reg.paused) {
-      console.log(`   🔓 Unpausing userId ${reg.userId} via BidJS API...`);
-      await bidjsClient.patch(`/v2/auctions/${auctionUuid}/registrants/${reg.userId}`, {
-        status: 'Approved',
-      });
-      console.log(`   ✅ Unpaused userId ${reg.userId}`);
+    // Update paused flag if changed
+    if (overLimit !== !!reg.paused) {
+      // call BidJS to change status
+      const newStatus = overLimit ? 'DepositRequested' : 'Approved';
+      console.log(`   🔄 Setting status=${newStatus} on BidJS for userId ${reg.userId}`);
+      await bidjsClient.patch(
+        `/v2/auctions/${auctionUuid}/registrants/${reg.userId}`,
+        { status: newStatus }
+      );
+      console.log(`   ✅ BidJS status updated to ${newStatus}`);
     } else {
-      console.log(`   ⏸️ No status change needed for userId ${reg.userId}`);
+      console.log(`   ⏸️ No status change needed`);
     }
   }
 
