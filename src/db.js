@@ -5,22 +5,23 @@ const db = new sqlite3.Database('./bidlimit.db');
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS registrants (
-      auctionUuid TEXT,
+      auctionId TEXT,
       userId TEXT,
       bidLimit INTEGER,      
       currentTotal INTEGER,
       paused INTEGER DEFAULT 0,
       updatedAt TEXT,
-      PRIMARY KEY (auctionUuid, userId)
+      PRIMARY KEY (auctionId, userId)
     )
   `);
 });
 
 module.exports = {
+  
   getAllForAuction(auc) {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT * FROM registrants WHERE auctionUuid = ?`,
+        `SELECT * FROM registrants WHERE auctionId = ?`,
         [auc],
         (err, rows) => (err ? reject(err) : resolve(rows))
       );
@@ -31,15 +32,15 @@ module.exports = {
     return new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO registrants
-           (auctionUuid, userId, bidLimit, currentTotal, paused, updatedAt)
+           (auctionId, userId, bidLimit, currentTotal, paused, updatedAt)
          VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(auctionUuid, userId) DO UPDATE SET
+         ON CONFLICT(auctionId, userId) DO UPDATE SET
            bidLimit=excluded.bidLimit,
            currentTotal=excluded.currentTotal,
            paused=excluded.paused,
            updatedAt=excluded.updatedAt`,
         [
-          rec.auctionUuid,
+          rec.auctionId,
           rec.userId,
           rec.bidLimit,
           rec.currentTotal,
@@ -51,11 +52,13 @@ module.exports = {
     });
   },
 
+  
+
   markPaused(auc, regUuid) {
-    return this.upsert({ auctionUuid: auc, userId: regUuid, paused: true, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
+    return this.upsert({ auctionId: auc, userId: regUuid, paused: true, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
   },
 
   markUnpaused(auc, regUuid) {
-    return this.upsert({ auctionUuid: auc, userId: regUuid, paused: false, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
+    return this.upsert({ auctionId: auc, userId: regUuid, paused: false, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
   },
 };

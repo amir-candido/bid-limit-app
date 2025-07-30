@@ -2,13 +2,13 @@
 const db = require('./db');
 const bidjsClient = require('./bidjsClient');
 
-async function enforceLimitsForAuction(auctionUuid) {
-  console.log(`\n🛎️ Enforcing limits for auction: ${auctionUuid}`);
+async function enforceLimitsForAuction(auctionId) {
+  console.log(`\n🛎️ Enforcing limits for auction: ${auctionId}`);
 
   // 1) Fetch the Auction Report
-  console.log(`📡 Fetching auction report for ${auctionUuid}...`);
+  console.log(`📡 Fetching auction report for ${auctionId}...`);
   const resp = await bidjsClient.get(
-    `/auction-mgt/bdxapi/reporting/auction/${auctionUuid}/category?clientId=411`
+    `/auction-mgt/bdxapi/reporting/auction/${auctionId}/category?clientId=411`
   );
   const items = resp.data?.models?.auctionReport?.items || [];
   console.log(`✅ Retrieved ${items.length} items from auction report`);
@@ -42,11 +42,11 @@ async function enforceLimitsForAuction(auctionUuid) {
   const now = new Date().toISOString();
   for (const userId of Object.keys(seen)) {
     // fetch existing record to preserve bidLimit & paused flag
-    const [existing] = await db.getAllForAuction(auctionUuid)
+    const [existing] = await db.getAllForAuction(auctionId)
       .then(rows => rows.filter(r => r.userId === userId));
 
     await db.upsert({
-      auctionUuid,
+      auctionId,
       userId,
       bidLimit: existing ? existing.bidLimit : null,
       currentTotal: totals[userId] || 0,
@@ -57,8 +57,8 @@ async function enforceLimitsForAuction(auctionUuid) {
   }
 
   // 4) Fetch all registrants now in DB
-  console.log(`\n🗃️ Fetching registrants from DB for auction ${auctionUuid}...`);
-  const regs = await db.getAllForAuction(auctionUuid);
+  console.log(`\n🗃️ Fetching registrants from DB for auction ${auctionId}...`);
+  const regs = await db.getAllForAuction(auctionId);
   console.log(`✅ Found ${regs.length} registrants in DB.`);
 
   // 5) Enforce limits via BidJS API
@@ -78,7 +78,7 @@ async function enforceLimitsForAuction(auctionUuid) {
       const newStatus = overLimit ? 'DepositRequested' : 'Approved';
       console.log(`   🔄 Setting status=${newStatus} on BidJS for userId ${reg.userId}`);
       await bidjsClient.patch(
-        `/v2/auctions/${auctionUuid}/registrants/${reg.userId}`,
+        `/v2/auctions/${auctionId}/registrants/${reg.userId}`,
         { status: newStatus }
       );
       console.log(`   ✅ BidJS status updated to ${newStatus}`);
@@ -87,7 +87,7 @@ async function enforceLimitsForAuction(auctionUuid) {
     }
   }
 
-  console.log(`\n✅ Enforcement complete for auction ${auctionUuid}\n`);
+  console.log(`\n✅ Enforcement complete for auction ${auctionId}\n`);
 }
 
 module.exports = { enforceLimitsForAuction };
