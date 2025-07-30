@@ -52,7 +52,23 @@ module.exports = {
     });
   },
 
-  
+  getAllAuctions() {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT DISTINCT auctionId
+         FROM registrants
+         ORDER BY auctionId`,
+        [],
+        (err, rows) => {
+          if (err) return reject(err);
+          // rows is like [ { auctionId: '8095' }, { auctionId: '8123' }, … ]
+          const auctions = rows.map(r => r.auctionId);
+          resolve(auctions);
+        }
+      );
+    });
+  },
+},  
 
   markPaused(auc, regUuid) {
     return this.upsert({ auctionId: auc, userId: regUuid, paused: true, bidLimit: null, currentTotal: 0, updatedAt: new Date().toISOString() });
