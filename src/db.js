@@ -35,6 +35,26 @@ const initSchema = () => {
 
 initSchema();
 
+const initUsersSchema = () => {
+  const createTableSql = `CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    email         TEXT NOT NULL UNIQUE,
+    passwordHash  TEXT NOT NULL,
+    role          TEXT DEFAULT 'admin',
+    createdAt     TEXT NOT NULL,
+    updatedAt     TEXT NOT NULL
+  )`;
+
+  db.run(createTableSql, err => {
+    if (err) {
+      console.error('Failed to create users table:', err.message);
+      process.exit(1);
+    }
+  });
+};
+
+initUsersSchema();
+
 module.exports = {
   /**
    * Get all registrants for a given auction.
