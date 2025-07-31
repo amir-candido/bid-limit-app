@@ -25,7 +25,7 @@ app.use(morgan((tokens, req, res) => {
 // Allow your UI origin (or all origins) to access these endpoints:
 app.use(
   cors({
-    origin: 'https://api.amircandido.tech',  
+    origin: 'https://bid-limit-ui.pages.dev',  
     methods: ['GET','POST','PATCH','OPTIONS'],
     allowedHeaders: ['Content-Type','Authorization','BDXAPI_NAME'],
     credentials: false
