@@ -8,6 +8,8 @@ const { PORT } = require('./config');
 
 const app = express();
 
+app.use(cors());
+
 // JSON‑body parsing
 app.use(express.json());
 
@@ -21,17 +23,6 @@ app.use(morgan((tokens, req, res) => {
     '- Headers:', JSON.stringify(req.headers)
   ].join(' ');
 }));
-
-// Allow your UI origin (or all origins) to access these endpoints:
-app.use(
-  cors({
-    origin: 'https://bid-limit-ui.pages.dev',  
-    methods: ['GET','POST','PATCH','OPTIONS'],
-    allowedHeaders: ['Content-Type','Authorization','BDXAPI_NAME'],
-    credentials: false
-  })
-);
-
 
 
 // Mount your admin API
