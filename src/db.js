@@ -36,7 +36,7 @@ const initSchema = () => {
 initSchema();
 
 const initUsersSchema = () => {
-  const createTableSql = `CREATE TABLE IF NOT EXISTS users (
+  const createUserTableSql = `CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     email         TEXT NOT NULL UNIQUE,
     passwordHash  TEXT NOT NULL,
@@ -45,7 +45,7 @@ const initUsersSchema = () => {
     updatedAt     TEXT NOT NULL
   )`;
 
-  db.run(createTableSql, err => {
+  db.run(createUserTableSql, err => {
     if (err) {
       console.error('Failed to create users table:', err.message);
       process.exit(1);
