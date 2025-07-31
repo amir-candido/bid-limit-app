@@ -8,6 +8,9 @@ const { PORT } = require('./config');
 
 const app = express();
 
+// JSON‑body parsing
+app.use(express.json());
+
 app.use(morgan((tokens, req, res) => {
   return [
     tokens.method(req, res),
@@ -22,15 +25,14 @@ app.use(morgan((tokens, req, res) => {
 // Allow your UI origin (or all origins) to access these endpoints:
 app.use(
   cors({
-    origin: 'https://bid-limit-ui.pages.dev',  
+    origin: 'https://api.amircandido.tech',  
     methods: ['GET','POST','PATCH','OPTIONS'],
     allowedHeaders: ['Content-Type','Authorization','BDXAPI_NAME'],
     credentials: false
   })
 );
 
-// JSON‑body parsing
-app.use(express.json());
+
 
 // Mount your admin API
 app.use('/admin', api);
