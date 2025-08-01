@@ -9,4 +9,5 @@ module.exports = {
   Auctioneer_ID: process.env.Auctioneer_ID,
   CORS_ORIGIN_LOCAL: process.env.CORS_ORIGIN_LOCAL,
   CORS_ORIGIN_PRODUCTION: process.env.CORS_ORIGIN_PRODUCTION,
+  BCRYPT_SALT_ROUNDS: Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
 };
