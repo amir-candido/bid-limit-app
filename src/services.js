@@ -186,7 +186,7 @@ async function enforceLimitsForAuction(auctionId) {
     // Only hit BidJS if we need to change state    
     // If paused state needs changing, call the BidJS Registrant API
     if (overLimit !== Boolean(reg.paused)) {
-      const newStatus = overLimit ? 'DepositRequested' : 'Approved';
+      const newStatus = overLimit ? 4 : 2;
       console.log(`   🔄 Setting status=${newStatus} for registrantUuid=${registrantUuid}`);
 
       try {
