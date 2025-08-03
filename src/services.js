@@ -44,6 +44,12 @@ async function enforceLimitsForAuction(auctionId) {
   const report = resp.data?.models?.auctionReport || {};
   const items = report.items || [];            // Array of ItemReportModel
   const auctionUuid = report.auctionUuid || null;
+
+  // Check if auctionUuid is available
+  if (!auctionUuid) {
+    throw new Error(`No auctionUuid found in the auction report for auctionId ${auctionId}`);
+  }
+
   console.log(`✅ Retrieved ${items.length} items; auctionUuid=${auctionUuid}`);
 
   // 2) Build totals & collect all seen registrants, plus metadata
@@ -185,7 +191,7 @@ async function enforceLimitsForAuction(auctionId) {
 
       try {
         await bidjsMgmtClient.patch(
-          `/v2/auctions/${auctionId}/registrants/${registrantUuid}`,
+          `/v2/auctions/${auctionUuid}/registrants/${registrantUuid}`,
           { status: newStatus }
         );
         console.log(`   ✅ BidJS status updated to ${newStatus}`);
