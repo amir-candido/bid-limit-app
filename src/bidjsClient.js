@@ -9,4 +9,4 @@ bidjsClient.defaults.headers.common['BDXAPI_NAME']      = getBidJsSignature();
 const bidjsMgmtClient = axios.create({ baseURL: BIDJS_BASE_II });
 bidjsMgmtClient.defaults.headers.common['BDXAPI_NAME'] = getBidJsSignature();
 
-module.exports = { bidjsClient, createBidJsClient };
+module.exports = { bidjsClient };
