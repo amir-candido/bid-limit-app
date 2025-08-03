@@ -1,6 +1,6 @@
 
 const { BIDJS_BASE, Client_ID, Auctioneer_ID } = require('./config');
-const bidjsClient = require('./bidjsClient');
+const { bidjsClient } = require('./bidjsClient');
 
 
 async function getAuctionReport(auctionId) {
