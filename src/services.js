@@ -192,7 +192,7 @@ async function enforceLimitsForAuction(auctionId) {
       try {
       await bidjsMgmtClient.patch(
         `/v2/auctions/${auctionUuid}/registrants/${registrantUuid}`,
-        { statusChange: { newStatus: newStatus } } // ✅ Correct structure
+        { statusChange: newStatus } // Send status as direct string
       );
         console.log(`   ✅ BidJS status updated to ${newStatus}`);
       } catch (err) {
