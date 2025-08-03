@@ -190,10 +190,10 @@ async function enforceLimitsForAuction(auctionId) {
       console.log(`   🔄 Setting status=${newStatus} for registrantUuid=${registrantUuid}`);
 
       try {
-        await bidjsMgmtClient.patch(
-          `/v2/auctions/${auctionUuid}/registrants/${registrantUuid}`,
-          { status: newStatus }
-        );
+      await bidjsMgmtClient.patch(
+        `/v2/auctions/${auctionUuid}/registrants/${registrantUuid}`,
+        { statusChange: { newStatus: newStatus } } // ✅ Correct structure
+      );
         console.log(`   ✅ BidJS status updated to ${newStatus}`);
       } catch (err) {
         // Here we catch *only* errors from that patch call
