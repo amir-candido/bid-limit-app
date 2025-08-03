@@ -4,9 +4,9 @@ const { getBidJsSignature } = require('./auth');
 const { BIDJS_BASE,  BIDJS_BASE_II} = require('./config');
 
 const bidjsClient = axios.create({ baseURL: BIDJS_BASE });
-bidjsClient.defaults.headers.common['BDXAPI_NAME']      = getBidJsSignature();
+bidjsClient.defaults.headers.common['bdxapi_name']      = getBidJsSignature();
 
 const bidjsMgmtClient = axios.create({ baseURL: BIDJS_BASE_II });
-bidjsMgmtClient.defaults.headers.common['BDXAPI_NAME'] = getBidJsSignature();
+bidjsMgmtClient.defaults.headers.common['bdxapi_name'] = getBidJsSignature();
 
 module.exports = { bidjsClient, bidjsMgmtClient };
