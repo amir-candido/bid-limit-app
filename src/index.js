@@ -5,6 +5,7 @@ const api     = require('./api');
 const morgan  = require('morgan');
 const { startScheduler } = require('./poller');
 const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL } = require('./config');
+const { startBidJsSocket } = require('./bidjsSocket');
 
 const app = express();
 
@@ -43,4 +44,5 @@ app.use('/admin', api);
 app.listen(PORT, () => {
   console.log(`Admin API listening on port ${PORT}`);
   startScheduler();
+  startBidJsSocket();
 });

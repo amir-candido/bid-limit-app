@@ -25,7 +25,7 @@ async function enforceLimitsForAuction(auctionId) {
 
   // 1) Fetch the Auction Report
   // --------------------------------
-  console.log(`📡 Fetching auction report for ${auctionId}...`);
+  console.log(`📡 Fetching auction report for auctionId: ${auctionId}...`);
   const resp = await bidjsClient.get(
     // BidJS endpoint for the per‐category auction report
     `/auction-mgt/bdxapi/reporting/auction/${auctionId}/category?clientId=411`
