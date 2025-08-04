@@ -4,7 +4,7 @@ module.exports = {
       name: 'bid-limit-app',
       script: 'src/index.js',
       watch: ['src', 'config'],
-      ignore_watch: ['node_modules', 'logs', '*.log',  '*.db'],
+      ignore_watch: ['node_modules', 'logs', '*.log',  '*.db', 'bidlimit.db-journal'],
       env_development: {
         NODE_ENV: 'development',
         watch: true // Enable watch only in development
