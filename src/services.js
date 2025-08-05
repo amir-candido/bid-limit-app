@@ -165,7 +165,8 @@ async function enforceLimitsForAuction(auctionId) {
     //   bidLimit, currentTotal, paused, updatedAt }
     const total     = reg.currentTotal;
     const bidLimit  = reg.bidLimit;
-    const overLimit = bidLimit !== null && total >= bidLimit;
+    //bidders are overlimit when bidLimit == 0 or total >= bidLimit
+    const overLimit = bidLimit === 0 || (bidLimit !== null && total >= bidLimit);
 
     console.log(`\n👤 Checking userId ${reg.userId}`);
     console.log(`   - Full name:        ${reg.fullname || '(unknown)'}`);
