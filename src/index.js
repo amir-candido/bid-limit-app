@@ -43,6 +43,6 @@ app.use('/admin', api);
 
 app.listen(PORT, () => {
   console.log(`Admin API listening on port ${PORT}`);
-  startScheduler();
+  //startScheduler();
   startBidJsSocket();
 });

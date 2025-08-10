@@ -1,5 +1,5 @@
 const schedule = require('node-schedule');
-const {  fetchAllAuctionUUIDs }= require('./getAuctions');
+const {  fetchAllAuctionUUIDs }= require('./bidjs-rest');
 const { enforceLimitsForAuction } = require('./services');
 
 async function startScheduler() {
