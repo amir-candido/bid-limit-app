@@ -11,5 +11,9 @@ module.exports = {
   CORS_ORIGIN_PRODUCTION: process.env.CORS_ORIGIN_PRODUCTION,
   BCRYPT_SALT_ROUNDS: Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
   BIDJS_BASE_II: process.env.BIDJS_BASE_II,
-  BIDJS_WS_URL: process.env.BIDJS_WS_URL
+  BIDJS_WS_URL: process.env.BIDJS_WS_URL,
+  SVIX_WEBHOOK_SECRET: process.env.SVIX_WEBHOOK_SECRET,
+  DB_PASSWORD: process.env.DB_PASSWORD,
+  DB_USER: process.env.DB_USER
+
 };
