@@ -35,6 +35,7 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
   let evt;
   try {
     evt = wh.verify(payload, headers);
+    console.log('Webhook verified:', evt);
   } catch (err) {
     return res.status(400).json({ error: 'Invalid webhook signature' });
   }
