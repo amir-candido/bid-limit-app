@@ -10,6 +10,8 @@ const { startScheduler } = require('./poller');
 const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, DB_USER, DB_PASSWORD, SVIX_WEBHOOK_SECRET } = require('./config');
 const { startBidJsSocket } = require('./bidjsSocket');
 
+const wh  = new Webhook(SVIX_WEBHOOK_SECRET);
+
 const app = express();
 
 //This prevents undefined entries if you forget to define one in your .env.
@@ -47,8 +49,7 @@ redis.on('error', (err) => console.error('Redis error:', err));
 
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const payload = req.body;
-  const headers = req.headers;
-  const wh      = new Webhook(SVIX_WEBHOOK_SECRET);
+  const headers = req.headers;  
 
   let evt;
   try {
@@ -60,7 +61,7 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
 
   try {
 
-    const { auctionUuid, registrantUuid, userUuid, fullName, bidLimit } = evt;
+    const { auctionUuid, registrantUuid, userUuid, fullName } = evt;
 
     if (!auctionUuid || !registrantUuid || !userUuid) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -69,11 +70,10 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     // 1. Upsert into MySQL
     const sql = `
       INSERT INTO registrants
-        (auctionUuid, registrantUuid, userUuid, fullName, bidLimit)
-      VALUES (?, ?, ?, ?, ?)
+        (auctionUuid, registrantUuid, userUuid, fullName)
+      VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         fullName = VALUES(fullName),
-        bidLimit = VALUES(bidLimit),
         updatedAt = CURRENT_TIMESTAMP
     `;
 
@@ -81,8 +81,7 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
       auctionUuid, 
       registrantUuid, 
       userUuid, 
-      fullName, 
-      bidLimit
+      fullName
     ]);
     console.log(`MySQL upsert: ${result.affectedRows} rows affected, ${result.changedRows} rows changed`);
     
@@ -92,9 +91,13 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     await redis.hset(`auction:${auctionUuid}:registrant:${registrantUuid}`, {
       userUuid,
       fullName: fullName || '',
-      bidLimit: bidLimit == null ? '' : String(bidLimit)
+      bidLimit: ''
     });
-    redis.on('error', (err) => console.error('Redis error:', err));
+
+    await redis.hset(`auction:${auctionUuid}:bidLimit`, userUuid, '');    
+
+    const saved = await redis.hgetall(`auction:${auctionUuid}:registrant:${registrantUuid}`);
+    console.log('Saved registrant hash:', saved);
 
     res.sendStatus(200);
   } catch (err) {

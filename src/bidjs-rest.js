@@ -37,13 +37,16 @@ async function fetchAllAuctions() {
 }
 
 async function fetchAllAuctionUUIDs() {
+
   try {
-    const auctions = await fetchAllAuctions();
-    return auctions.map(a => a.id);
+  const { data } = await bidjsClient.get(`${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`);
+  const auctions = data.models?.auctionReferenceModel?.collection || [];
+  return auctions.map(a => a.uuid);
   } catch (err) {
-    console.error('bidjs-rest.js fetchAllAuctionUUIDs: Failed to fetch auction UUIDs:', err.message);
-    return [];
+  console.error('bidjs-rest.js fetchAllAuctionUUIDs: Failed to fetch auction UUIDs:', err.message);
+  return [];
   }
+  
 }
 
 async function fetchAuctionWinners(auctionId) {
