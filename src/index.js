@@ -80,6 +80,21 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     });
     redis.on('error', (err) => console.error('Redis error:', err));
 
+    const savedData = await redis.hgetall(redisKey);
+    console.log('Redis verification:', savedData);
+
+    // Verify critical fields
+    if (savedData.auctionUuid !== auctionUuid || 
+        savedData.userUuid !== userUuid) {
+      console.error('Redis data mismatch!', {
+        expected: { auctionUuid, userUuid },
+        actual: { 
+          auctionUuid: savedData.auctionUuid, 
+          userUuid: savedData.userUuid 
+        }
+      });
+    }    
+
     res.sendStatus(200);
   } catch (err) {
     console.error('Webhook processing error:', err);
