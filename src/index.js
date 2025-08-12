@@ -49,16 +49,14 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     }
 
     // 1. Upsert into MySQL
-    const sql = `
-      INSERT INTO registrants
-        (auctionUuid, registrantUuid, userUuid, fullName, bidLimit)
-      VALUES (?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        fullName = VALUES(fullName),
-        bidLimit = VALUES(bidLimit),
-        updatedAt = CURRENT_TIMESTAMP
-    `;
-    await db.query(sql, [auctionUuid, registrantUuid, userUuid, fullName, bidLimit]);
+    const [result] = await db.query(sql, [
+      auctionUuid, 
+      registrantUuid, 
+      userUuid, 
+      fullName, 
+      bidLimit
+    ]);
+    console.log(`MySQL upsert: ${result.affectedRows} rows affected, ${result.changedRows} rows changed`);
     db.on('error', (err) => console.error('MySQL pool error:', err));
 
     // 2. HMSET into Redis
