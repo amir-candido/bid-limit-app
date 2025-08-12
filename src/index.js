@@ -5,7 +5,7 @@ const api     = require('./api');
 const morgan  = require('morgan');
 const mysql = require('mysql2/promise');
 const Redis = require('ioredis');
-const { Svix, Webhook } = require('svix');
+const { Webhook } = require('svix');
 const { startScheduler } = require('./poller');
 const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, DB_USER, DB_PASSWORD, SVIX_WEBHOOK_SECRET } = require('./config');
 const { startBidJsSocket } = require('./bidjsSocket');
@@ -26,6 +26,24 @@ app.use(cors({
   methods: ['GET','POST','PATCH','OPTIONS']
 }));
 
+// MySQL connection
+const db = mysql.createPool({
+  host: 'localhost',
+  user: DB_USER,
+  password: DB_PASSWORD,
+  database: 'bidapp',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0  
+});
+db.on && db.on('error', (err) => console.error('MySQL pool error:', err)); 
+
+// Redis connection
+const redis = new Redis({
+  host: '127.0.0.1',
+  port: 6379
+});
+redis.on('error', (err) => console.error('Redis error:', err));
 
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const payload = req.body;
@@ -67,33 +85,16 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
       bidLimit
     ]);
     console.log(`MySQL upsert: ${result.affectedRows} rows affected, ${result.changedRows} rows changed`);
-    db.on('error', (err) => console.error('MySQL pool error:', err));
+    
 
     // 2. HMSET into Redis
-    const redisKey = `registrant:${auctionUuid}:${userUuid}`;
-    await redis.hset(redisKey, {
-      auctionUuid,
-      registrantUuid,
+    await redis.hset(`auction:${auctionUuid}:userToRegistrant`, userUuid, registrantUuid);
+    await redis.hset(`auction:${auctionUuid}:registrant:${registrantUuid}`, {
       userUuid,
       fullName: fullName || '',
-      bidLimit: bidLimit ?? ''  // Preserves 0
+      bidLimit: bidLimit == null ? '' : String(bidLimit)
     });
     redis.on('error', (err) => console.error('Redis error:', err));
-
-    const savedData = await redis.hgetall(redisKey);
-    console.log('Redis verification:', savedData);
-
-    // Verify critical fields
-    if (savedData.auctionUuid !== auctionUuid || 
-        savedData.userUuid !== userUuid) {
-      console.error('Redis data mismatch!', {
-        expected: { auctionUuid, userUuid },
-        actual: { 
-          auctionUuid: savedData.auctionUuid, 
-          userUuid: savedData.userUuid 
-        }
-      });
-    }    
 
     res.sendStatus(200);
   } catch (err) {
@@ -120,19 +121,6 @@ app.use(morgan((tokens, req, res) => {
 // Mount your admin API
 app.use('/admin', api);
 
-// MySQL connection
-const db = mysql.createPool({
-  host: 'localhost',
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: 'bidapp'
-});
-
-// Redis connection
-const redis = new Redis({
-  host: '127.0.0.1',
-  port: 6379
-});
 
 app.listen(PORT, () => {
   console.log(`Admin API listening on port ${PORT}`);
