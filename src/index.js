@@ -49,6 +49,16 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     }
 
     // 1. Upsert into MySQL
+    const sql = `
+      INSERT INTO registrants
+        (auctionUuid, registrantUuid, userUuid, fullName, bidLimit)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        fullName = VALUES(fullName),
+        bidLimit = VALUES(bidLimit),
+        updatedAt = CURRENT_TIMESTAMP
+    `;
+
     const [result] = await db.query(sql, [
       auctionUuid, 
       registrantUuid, 
