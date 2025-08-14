@@ -1,8 +1,8 @@
 const { processNewHighestBid } = require('./processNewHighestBid');
 
-// handleMessage(msg) — core logic skeleton 
+// handleMessage(msg) — core logic skeleton
 async function handleMessage(msg) {
-  if (!msg || !msg.action) {return;}
+  if (!msg || !msg.action) return;
   const action = msg.action;
   const data = msg.data || {};
 
@@ -20,14 +20,29 @@ async function handleMessage(msg) {
     return;
   }
 
-  // Models: bid.uuid, bid.userUuid, bid.listingUuid ; saleStatus.highestBidUuid, saleStatus.listingUuid.
-  // If this bid is the new highest, saleStatus.highestBidUuid === bid.uuid
-  const isNowHighest = (saleStatus.highestBidUuid === bid.uuid);
+  const bidUuid     = bid && bid.uuid;
+  const userUuid    = bid && bid.userUuid;
+  const listingUuid = saleStatus && (saleStatus.listingUuid || bid.listingUuid);
 
-  if (isNowHighest) {
-    // hand off to atomic redis handler to swap ownership, check limit, etc.
-    await processNewHighestBid({ auctionUuid, listingUuid: saleStatus.listingUuid || bid.listingUuid, newUserUuid: bid.userUuid, bidUuid: bid.uuid });
-  } 
+  if (!bidUuid || !userUuid || !listingUuid) {
+    console.warn('BID_PLACED missing bid/listing/user identifiers', { auctionUuid, bidUuid, userUuid, listingUuid });
+    return;
+  }
+
+  // If this bid is the new highest: saleStatus.highestBidUuid === bid.uuid
+  const isNowHighest = (saleStatus.highestBidUuid === bidUuid);
+
+  if (!isNowHighest) return;
+
+  try {
+    console.log('Processing new highest bid', { auctionUuid, listingUuid, bidUuid, userUuid });
+    await processNewHighestBid({ auctionUuid, listingUuid, newUserUuid: userUuid, bidUuid });
+  } catch (err) {
+    // Local error handling — upstream ws code also catches, but this gives more context
+    console.error('Error processing new highest bid', { auctionUuid, listingUuid, bidUuid, userUuid, err: err && err.message || err });
+    // Optionally enqueue the event for retry:
+    // await enqueuePendingBid({ auctionUuid, listingUuid, newUserUuid: userUuid, bidUuid });
+  }
 }
 
 module.exports = { handleMessage };
