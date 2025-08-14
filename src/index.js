@@ -3,11 +3,11 @@ const express = require('express');
 const cors    = require('cors');
 const api     = require('./api');
 const morgan  = require('morgan');
-const mysql   = require('mysql2/promise');
-const Redis   = require('ioredis');
 const { Webhook } = require('svix');
-const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, DB_USER, DB_PASSWORD, SVIX_WEBHOOK_SECRET } = require('./config');
+const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, SVIX_WEBHOOK_SECRET } = require('./config');
 const { startBidJsSocket } = require('./bidjsSocket');
+const { db } = require('./db');
+const { redis } = require('./redis');
 
 const wh  = new Webhook(SVIX_WEBHOOK_SECRET);
 
@@ -26,24 +26,7 @@ app.use(cors({
   methods: ['GET','POST','PATCH','OPTIONS']
 }));
 
-// MySQL connection
-const db = mysql.createPool({
-  host: 'localhost',
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: 'bidapp',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0  
-});
-db.on && db.on('error', (err) => console.error('MySQL pool error:', err)); 
 
-// Redis connection
-const redis = new Redis({
-  host: '127.0.0.1',
-  port: 6379
-});
-redis.on('error', (err) => console.error('Redis error:', err));
 
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const payload = req.body;

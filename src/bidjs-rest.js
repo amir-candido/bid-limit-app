@@ -114,7 +114,7 @@ async function fetchAllRegistrantsByAuctionId(auctionId) {
  * @param {string} status - The status to set (default: 'SUSPENDED').
  * @returns {Promise<Object>} - The API response data.
  */
-async function patchRegistrant(auctionUuid, registrantUuid, status = 'SUSPENDED') {
+async function patchRegistrant(auctionUuid, registrantUuid, status = 'AWAITING_DEPOSIT') {
   console.log('--- patchRegistrant called ---');
   console.log('Auction UUID:', auctionUuid);
   console.log('Registrant UUID:', registrantUuid);

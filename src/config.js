@@ -14,6 +14,8 @@ module.exports = {
   BIDJS_WS_URL: process.env.BIDJS_WS_URL,
   SVIX_WEBHOOK_SECRET: process.env.SVIX_WEBHOOK_SECRET,
   DB_PASSWORD: process.env.DB_PASSWORD,
-  DB_USER: process.env.DB_USER
+  DB_USER: process.env.DB_USER,
+  REDIS_HOST: process.env.REDIS_HOST,
+  REDIS_PORT: process.env.REDIS_PORT
 
 };
