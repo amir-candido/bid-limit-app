@@ -4,7 +4,7 @@ const { BIDJS_WS_URL, Client_ID } = require('./config');
 const { getBidJsSignature } = require('./auth');
 const { fetchAllAuctionUUIDs } = require('./bidjs-rest'); // REST helper
 
-const { handleMessage } = require('./bidjsSocketHandlers');
+const { handleMessage } = require('./handleMessage');
 
 // Constant for WebSocket reconnection delay
 const RECONNECT_DELAY = 5000; // 5 seconds
@@ -29,7 +29,7 @@ function startBidJsSocket() {
     try {
       // Fetch all auction UUIDs to subscribe to
       const auctionUUIDs = await fetchAllAuctionUUIDs();
-      console.log('auctionUUIDs:', auctionUUIDs);
+      console.log('Here are the auctionUUIDs we are subscribing to:', auctionUUIDs);
 
       // Subscribe to auctions if the WebSocket is still open
       //To subscribe to multiple Auctions you must send a message with an Array of Auction UUIDs, as follows.
@@ -49,7 +49,7 @@ function startBidJsSocket() {
   });
 
   // Handle incoming WebSocket messages
-   socket.on('message', async (raw) => {
+   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw);
       handleMessage(msg);

@@ -107,11 +107,51 @@ async function fetchAllRegistrantsByAuctionId(auctionId) {
   }
 }
 
+/**
+ * Suspends or updates a registrant's status in BidJS.
+ * @param {string} auctionUuid - The UUID of the auction.
+ * @param {string} registrantUuid - The UUID of the registrant.
+ * @param {string} status - The status to set (default: 'SUSPENDED').
+ * @returns {Promise<Object>} - The API response data.
+ */
+async function patchRegistrant(auctionUuid, registrantUuid, status = 'SUSPENDED') {
+  console.log('--- patchRegistrant called ---');
+  console.log('Auction UUID:', auctionUuid);
+  console.log('Registrant UUID:', registrantUuid);
+  console.log('New Status:', status);
+
+  try {
+    const endpoint = `${BIDJS_BASE}/v2/auctions/${auctionUuid}/registrants/${registrantUuid}`;
+    console.log('PATCH Endpoint:', endpoint);
+
+    const payload = { "statusChange": status };
+    console.log('Request Payload:', payload);
+
+    const { data } = await bidjsClient.patch(endpoint, payload);
+    console.log('BidJS Response:', JSON.stringify(data, null, 2));
+
+    console.log('--- patchRegistrant completed successfully ---');
+    return data;
+
+  } catch (error) {
+    console.error('--- patchRegistrant ERROR ---');
+    console.error('Error Message:', error.message);
+    if (error.response) {
+      console.error('Status Code:', error.response.status);
+      console.error('Error Response Data:', JSON.stringify(error.response.data, null, 2));
+    }
+    console.error('------------------------------');
+    throw error;
+  }
+}
+
+
 module.exports = {
   fetchAllAuctions,
   fetchActiveAuctions,
   fetchAllAuctionUUIDs,
   getAuctionReport,
   fetchAuctionWinners,
-  fetchAllRegistrantsByAuctionId
+  fetchAllRegistrantsByAuctionId,
+  patchRegistrant
 };

@@ -3,10 +3,9 @@ const express = require('express');
 const cors    = require('cors');
 const api     = require('./api');
 const morgan  = require('morgan');
-const mysql = require('mysql2/promise');
-const Redis = require('ioredis');
+const mysql   = require('mysql2/promise');
+const Redis   = require('ioredis');
 const { Webhook } = require('svix');
-const { startScheduler } = require('./poller');
 const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, DB_USER, DB_PASSWORD, SVIX_WEBHOOK_SECRET } = require('./config');
 const { startBidJsSocket } = require('./bidjsSocket');
 
@@ -14,7 +13,6 @@ const wh  = new Webhook(SVIX_WEBHOOK_SECRET);
 
 const app = express();
 
-//This prevents undefined entries if you forget to define one in your .env.
 const allowed = [CORS_ORIGIN_LOCAL, CORS_ORIGIN_PRODUCTION].filter(Boolean);
 
 app.use(cors({
@@ -127,6 +125,5 @@ app.use('/admin', api);
 
 app.listen(PORT, () => {
   console.log(`Admin API listening on port ${PORT}`);
-  //startScheduler();
-  //startBidJsSocket();
+  startBidJsSocket();
 });
