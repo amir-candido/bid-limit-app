@@ -82,8 +82,6 @@ router.patch('/auctions/:auctionId/registrants/:registrantUuid', express.json(),
     paused: false,
     updatedAt: new Date().toISOString(),
   });
-
-  await enforceLimitsForAuction(auctionId);
   res.sendStatus(204);
 });
 
