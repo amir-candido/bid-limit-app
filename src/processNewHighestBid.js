@@ -1,6 +1,6 @@
 // src/processNewHighestBid.js
 const fs                        = require('fs');
-const lua                       = fs.readFileSync('./atomic_swap_and_check.lua', 'utf8');
+const lua                       = fs.readFileSync('./scripts/atomic_swap_and_check.lua', 'utf8');
 const {enqueueSuspensionRetry}  = require('./enqueueSuspensionRetry');
 const { patchRegistrant }       = require('./bidjs-rest');
 const { db }                    = require('./db');
@@ -134,12 +134,14 @@ async function processNewHighestBid(opts) {
 
     // Call BidJS to set status to AWATING_DEPOSIT
     try {
-      // patchRegistrant must accept (auctionUuid, registrantUuid, status)
+      // patchRegistrant must accept (auctionUuid, registrantUuid, status). 
+      // To see how "AWAITING DEPOSIT" is set, see route '/:auctionUuid/registrants/:userUuid/limit' in ./api
       const apiRes = await patchRegistrant(auctionUuid, registrantUuid, 'AWAITING_DEPOSIT');
       // Mark flag and write audit row
       await redis.set(awaitingFlagKey, '1'); // no TTL: persists until cleared by unsuspend logic
       //await recordSuspensionAudit?.(auctionUuid, newUserUuid, registrantUuid, 'awaiting_deposit', 'system', { apiResponse: apiRes });
       console.log('Marked registrant awaiting deposit', { auctionUuid, registrantUuid, newUserUuid, activeCount });
+      await redis.sadd(`auction:${auctionUuid}:suspendedUsers`, newUserUuid);
       return { status: 'ATLIMIT_ACTION_TAKEN', activeCount };
     } catch (err) {
       console.error('patchRegistrant failed; enqueuing retry', err);

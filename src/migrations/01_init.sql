@@ -29,3 +29,14 @@ CREATE TABLE IF NOT EXISTS auctions (
     PRIMARY KEY (id),
     UNIQUE KEY uniq_auctionUuid (auctionUuid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE suspension_actions (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  auctionUuid CHAR(36),
+  userUuid CHAR(36),
+  registrantUuid CHAR(36),
+  action VARCHAR(32), -- 'awaiting_deposit', 'unsuspend', 'limit_update'
+  actor VARCHAR(64),  -- 'system' or admin username
+  meta JSON NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

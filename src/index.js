@@ -8,6 +8,25 @@ const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, SVIX_WEBHOOK_SECRET } =
 const { startBidJsSocket } = require('./bidjsSocket');
 const { db } = require('./db');
 const { redis } = require('./redis');
+const { createLimitsService } = require('./api');
+const { patchRegistrant } = require('./bidjs-rest'); // your patch helper
+const { enqueueSuspensionRetry } = require('./src/services/retry'); // implementation earlier
+const { recordAudit } = require('./src/services/audit'); // optional
+
+
+const { router: limitsRouter, ensureBidLimitCached } = (() => {
+  const svc = createLimitsService({
+    db,
+    redis,
+    patchRegistrant,
+    enqueueSuspensionRetry,
+    recordAudit,
+    logger: console
+  });
+  return { router: svc.router, ensureBidLimitCached: svc.ensureBidLimitCached };
+})();
+
+app.use('/admin', limitsRouter);
 
 const wh  = new Webhook(SVIX_WEBHOOK_SECRET);
 
