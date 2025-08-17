@@ -4,6 +4,9 @@ module.exports = {
       name: 'bid-limit-app',
       script: 'src/index.js',
       watch: ['src', 'config'],
+      instances: "max",           // Use all CPU cores
+      max_memory_restart: "1G",   // Restart if memory exceeds 1GB
+      autorestart: true, 
       ignore_watch: ['node_modules', 'logs', '*.log',  '*.db', 'bidlimit.db-journal'],
       env_development: {
         NODE_ENV: 'development',

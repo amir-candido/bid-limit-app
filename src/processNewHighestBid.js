@@ -1,6 +1,10 @@
 // src/processNewHighestBid.js
+const path                      = require('path');
 const fs                        = require('fs');
-const lua                       = fs.readFileSync('./scripts/atomic_swap_and_check.lua', 'utf8');
+const lua                       = fs.readFileSync(
+  path.join(__dirname, 'scripts', 'atomic_swap_and_check.lua'),
+  'utf8'
+);
 const {enqueueSuspensionRetry}  = require('./services/enqueueSuspensionRetry');
 const { patchRegistrant }       = require('./bidjs-rest');
 const { ensureBidLimitCached }  = require('./services/ensureBidLimitCached');
