@@ -32,7 +32,7 @@ async function handleMessage(msg) {
   // If this bid is the new highest: saleStatus.highestBidUuid === bid.uuid
   const isNowHighest = (saleStatus.highestBidUuid === bidUuid);
 
-  if (!isNowHighest) return;
+  if (!isNowHighest) { return; }
 
   try {
     console.log('Processing new highest bid', { auctionUuid, listingUuid, bidUuid, userUuid });
