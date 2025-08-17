@@ -61,8 +61,6 @@ morgan.token('req-body', (req) => {
 });
 app.use(morgan(':method :url :status :response-time ms - Body: :req-body - Headers: :req[header]'));
 
-// JSON body parser for normal routes (webhook uses express.raw below)
-app.use(express.json());
 
 // Webhook endpoint (raw body preserved for signature verification)
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -122,6 +120,9 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     res.sendStatus(500);
   }
 });
+
+// JSON body parser for normal routes (webhook uses express.raw below)
+app.use(express.json());
 
 // start server after all routes/middleware registered
 app.listen(PORT, () => {
