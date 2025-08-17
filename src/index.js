@@ -1,136 +1,141 @@
 // src/index.js
 const express = require('express');
-const cors    = require('cors');
-const api     = require('./api');
-const morgan  = require('morgan');
+const cors = require('cors');
+const morgan = require('morgan');
 const { Webhook } = require('svix');
 const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, SVIX_WEBHOOK_SECRET } = require('./config');
 const { startBidJsSocket } = require('./bidjsSocket');
 const { db } = require('./db');
 const { redis } = require('./redis');
-const { createLimitsService } = require('./api');
-const { patchRegistrant } = require('./bidjs-rest'); // your patch helper
-const { enqueueSuspensionRetry } = require('./services/retry'); // implementation earlier
-const { recordAudit } = require('./services/audit'); // optional
+const { createLimitsService } = require('./api'); // ensure this module exports createLimitsService
+const { patchRegistrant } = require('./bidjs-rest');
+const { enqueueSuspensionRetry } = require('./services/enqueueSuspensionRetry');
 const { createRecordAudit } = require('./services/audit');
 
+const app = express(); // MUST be created before any app.use
 
-const auditSvc = createRecordAudit({ db, redis, options: { logger: console }});
+// create audit service
+const auditSvc = createRecordAudit({ db, redis, options: { logger: console } });
 const recordAudit = auditSvc.recordAudit;
 
+// create limits service (wires db/redis/patchRegistrant/etc)
+const limitsSvc = createLimitsService({
+  db,
+  redis,
+  patchRegistrant,
+  enqueueSuspensionRetry,
+  recordAudit,
+  logger: console
+});
+const limitsRouter = limitsSvc.router;
+// If you need ensureBidLimitCached exported, use limitsSvc.ensureBidLimitCached
+const ensureBidLimitCachedFromLimitsService = limitsSvc.ensureBidLimitCached;
 
-const { router: limitsRouter, ensureBidLimitCached } = (() => {
-        const svc = createLimitsService({
-          db,
-          redis,
-          patchRegistrant,
-          enqueueSuspensionRetry,
-          recordAudit,
-          logger: console
-        });
-        return { router: svc.router, ensureBidLimitCached: svc.ensureBidLimitCached };
-})();
-
+// mount admin routes (protect with auth middleware inside router)
 app.use('/admin', limitsRouter);
 
-const wh  = new Webhook(SVIX_WEBHOOK_SECRET);
+// configure webhook verifier
+const wh = new Webhook(SVIX_WEBHOOK_SECRET);
 
-const app = express();
-
+// configure CORS
 const allowed = [CORS_ORIGIN_LOCAL, CORS_ORIGIN_PRODUCTION].filter(Boolean);
-
 app.use(cors({
-        origin: (origin, cb) => {
-          if (!origin) return cb(null, true);
-          if (allowed.includes(origin)) return cb(null, true);
-          
-          console.warn(`🚫 Blocked CORS request from: ${origin}`);
-          cb(new Error(`Origin ${origin} not allowed by CORS`));
-        },
-        methods: ['GET','POST','PATCH','OPTIONS']
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowed.includes(origin)) return cb(null, true);
+    console.warn(`🚫 Blocked CORS request from: ${origin}`);
+    cb(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  methods: ['GET','POST','PATCH','OPTIONS']
 }));
 
-
-//Responds to 'AUCTION_REGISTRATION' Webhook Event
-app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-
-        const payload = req.body;
-        const headers = req.headers;  
-
-        let evt;
-        try { //verify svix
-          evt = wh.verify(payload, headers);
-          console.log('Webhook verified:', evt);
-        } catch (err) {
-          return res.status(400).json({ error: 'Invalid webhook signature' });
-        }
-
-        try {
-
-          const { auctionUuid, registrantUuid, userUuid, fullName } = evt;
-
-          if (!auctionUuid || !registrantUuid || !userUuid) {
-            return res.status(400).json({ error: 'Missing required fields' });
-          }
-
-          // 1. Upsert into MySQL
-          const sql = `INSERT INTO registrants
-              (auctionUuid, registrantUuid, userUuid, fullName)
-            VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-              fullName = VALUES(fullName),
-              updatedAt = CURRENT_TIMESTAMP`;
-
-          const [result] = await db.query(sql, [
-            auctionUuid, 
-            registrantUuid, 
-            userUuid, 
-            fullName
-          ]);
-          console.log(`MySQL upsert: ${result.affectedRows} rows affected, ${result.changedRows} rows changed`);
-          
-
-          // 2. HMSET into Redis
-          await redis.hset(`auction:${auctionUuid}:userToRegistrant`, userUuid, registrantUuid);
-          await redis.hset(`auction:${auctionUuid}:registrant:${registrantUuid}`, {
-            userUuid,
-            fullName: fullName || '',
-            bidLimit: ''
-          });
-
-          await redis.hset(`auction:${auctionUuid}:bidLimit`, userUuid, '');    
-
-          const saved = await redis.hgetall(`auction:${auctionUuid}:registrant:${registrantUuid}`);
-          console.log('Saved registrant hash:', saved);
-
-          res.sendStatus(200);
-        } catch (err) {
-          console.error('Webhook processing error:', err);
-          res.sendStatus(500); // Or 200 to avoid retries, log internally
-        }
-
+// morgan logger - mount near top so all requests are logged; use custom token to avoid Buffer serialization issues
+morgan.token('req-body', (req) => {
+  try {
+    if (!req.body) return '';
+    if (Buffer.isBuffer(req.body)) return `<raw ${req.body.length} bytes>`;
+    return JSON.stringify(req.body);
+  } catch (e) {
+    return '<unserializable body>';
+  }
 });
+app.use(morgan(':method :url :status :response-time ms - Body: :req-body - Headers: :req[header]'));
 
-// JSON‑body parsing
+// JSON body parser for normal routes (webhook uses express.raw below)
 app.use(express.json());
 
-app.use(morgan((tokens, req, res) => {
-        return [
-          tokens.method(req, res),
-          tokens.url(req, res),
-          tokens.status(req, res),
-          tokens['response-time'](req, res), 'ms',
-          '- Body:', JSON.stringify(req.body),
-          '- Headers:', JSON.stringify(req.headers)
-        ].join(' ');
-}));
+// Webhook endpoint (raw body preserved for signature verification)
+app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const payload = req.body; // Buffer
+  const headers = req.headers;
 
+  // svix verify — pass string if library requires it
+  let evt;
+  try {
+    // If svix accepts Buffer, this is fine; otherwise convert to string
+    const payloadForVerify = (typeof payload === 'string') ? payload : payload.toString('utf8');
+    evt = wh.verify(payloadForVerify, headers);
+    console.log('Webhook verified:', evt);
+  } catch (err) {
+    console.warn('Invalid webhook signature:', err && err.message);
+    return res.status(400).json({ error: 'Invalid webhook signature' });
+  }
 
-// Mount your admin API
-app.use('/admin', api);
+  try {
+    const { auctionUuid, registrantUuid, userUuid, fullName } = evt;
+    if (!auctionUuid || !registrantUuid || !userUuid) {
+      console.warn('Webhook missing required fields:', { auctionUuid, registrantUuid, userUuid });
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
+    // 1) Upsert into DB (authoritative)
+    const sql = `
+      INSERT INTO registrants
+        (auctionUuid, registrantUuid, userUuid, fullName)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        fullName = VALUES(fullName),
+        updatedAt = CURRENT_TIMESTAMP
+    `;
+    const [result] = await db.query(sql, [auctionUuid, registrantUuid, userUuid, fullName]);
+    console.log(`MySQL upsert: affected=${result.affectedRows}, changed=${result.changedRows}`);
 
+    // 2) Update Redis cache (best-effort)
+    const registrantHashKey = `auction:${auctionUuid}:registrant:${registrantUuid}`;
+    await redis.hset(`auction:${auctionUuid}:userToRegistrant`, userUuid, registrantUuid);
+    await redis.hset(registrantHashKey, {
+      userUuid,
+      fullName: fullName || '',
+      bidLimit: '' // empty string denotes unlimited
+    });
+    // Use canonical key name for bid limits
+    await redis.hset(`auction:${auctionUuid}:userBidLimit`, userUuid, '');
+
+    // verify saved
+    const saved = await redis.hgetall(registrantHashKey);
+    console.log('Saved registrant hash:', saved);
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook processing error:', err);
+    // Option: return 200 to avoid retries and log internal failure
+    res.sendStatus(500);
+  }
+});
+
+// start server after all routes/middleware registered
 app.listen(PORT, () => {
-        console.log(`Admin API listening on port ${PORT}`);
-        startBidJsSocket();
+  console.log(`Admin API listening on port ${PORT}`);
+  startBidJsSocket();
+});
+
+// graceful shutdown & error handling hooks (recommended)
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection', err);
+});
+process.on('SIGINT', async () => {
+  console.info('SIGINT received: closing resources');
+  try { await redis.quit(); } catch (e) {}
+  try { await db.end(); } catch (e) {}
+  process.exit(0);
 });

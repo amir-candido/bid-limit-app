@@ -1,7 +1,7 @@
 // src/processNewHighestBid.js
 const fs                        = require('fs');
 const lua                       = fs.readFileSync('./scripts/atomic_swap_and_check.lua', 'utf8');
-const {enqueueSuspensionRetry}  = require('./enqueueSuspensionRetry');
+const {enqueueSuspensionRetry}  = require('./services/enqueueSuspensionRetry');
 const { patchRegistrant }       = require('./bidjs-rest');
 const { ensureBidLimitCached }  = require('./services/ensureBidLimitCached');
 const { db }                    = require('./db');

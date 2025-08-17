@@ -1,5 +1,3 @@
-const { redis } = require('./redis');
-
 /**
  * Enqueue a failed suspension attempt for later retry with exponential backoff.
  * @param {object} redis - Redis client
