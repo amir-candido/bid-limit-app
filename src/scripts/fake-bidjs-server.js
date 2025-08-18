@@ -17,7 +17,7 @@ wss.on('connection', (ws, req) => {
         auctionUuid: '8c9a8bb8-24ee-432c-b81e-ab514e69ce1d',
         bid: {
           uuid: 'bid-0001',
-          userUuid: 'user-1111-uuid',
+          userUuid: 'ecb4dab8-feee-425d-98a0-df7ede1ac7b8',
           listingUuid: 'listing-101'
         },
         saleStatus: {

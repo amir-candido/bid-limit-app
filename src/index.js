@@ -31,9 +31,6 @@ const limitsRouter = limitsSvc.router;
 // If you need ensureBidLimitCached exported, use limitsSvc.ensureBidLimitCached
 const ensureBidLimitCachedFromLimitsService = limitsSvc.ensureBidLimitCached;
 
-// mount admin routes (protect with auth middleware inside router)
-app.use('/admin', limitsRouter);
-
 // configure webhook verifier
 const wh = new Webhook(SVIX_WEBHOOK_SECRET);
 
@@ -123,6 +120,8 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
 
 // JSON body parser for normal routes (webhook uses express.raw below)
 app.use(express.json());
+
+app.use('/admin', limitsRouter);
 
 // start server after all routes/middleware registered
 app.listen(PORT, () => {

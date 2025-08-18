@@ -1,4 +1,4 @@
-// src/limits.js
+// src/api.js
 const express = require('express');
 
 /**
@@ -147,8 +147,8 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
         router.get('/:auctionUuid/registrants', async (req, res) => {
           const auctionUuid = req.params.auctionUuid;
           const q = req.query.q ? String(req.query.q).trim() : null;
-          const page = Math.max(1, parseInt(req.query.page || '1', 10));
-          const pageSize = Math.min(200, Math.max(10, parseInt(req.query.pageSize || '50', 10)));
+          const pageSize = Math.min(200, Math.max(10, Number(req.query.pageSize) || 50));
+          const page = Math.max(1, Number(req.query.page) || 1);
           const offset = (page - 1) * pageSize;
 
           try {
@@ -159,8 +159,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
               sql += ` AND (fullName LIKE ? OR userUuid = ? OR registrantUuid = ?)`;
               params.push(`%${q}%`, q, q);
             }
-            sql += ` ORDER BY fullName ASC LIMIT ? OFFSET ?`;
-            params.push(pageSize, offset);
+            sql += ` ORDER BY fullName ASC LIMIT ${pageSize} OFFSET ${offset}`;
 
             const [rows] = await db.execute(sql, params);
 
