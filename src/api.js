@@ -245,7 +245,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
         });
 
         // PATCH limit - update DB then write-through to Redis; optional enforce param: ?enforce=true
-        router.patch('/auctions/:auctionUuid/registrants/:userUuid/limit', async (req, res) => {
+        router.patch('/auctions/:auctionUuid/registrants/:registrantUuid', async (req, res) => {
           const auctionUuid = req.params.auctionUuid;
           const userUuid = req.params.userUuid;
           let { bidLimit } = req.body;
