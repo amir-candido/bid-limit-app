@@ -156,7 +156,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
 
         // GET /admin/:auctionUuid/registrants
         // Query: ?q=&page=&pageSize=&sort=
-        router.get('/:auctionUuid/registrants', async (req, res) => {
+        router.get('/auctions/:auctionUuid/registrants', async (req, res) => {
           const auctionUuid = req.params.auctionUuid;
           const q = req.query.q ? String(req.query.q).trim() : null;
           const pageSize = Math.min(200, Math.max(10, Number(req.query.pageSize) || 50));
@@ -245,7 +245,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
         });
 
         // PATCH limit - update DB then write-through to Redis; optional enforce param: ?enforce=true
-        router.patch('/:auctionUuid/registrants/:userUuid/limit', async (req, res) => {
+        router.patch('/auctions/:auctionUuid/registrants/:userUuid/limit', async (req, res) => {
           const auctionUuid = req.params.auctionUuid;
           const userUuid = req.params.userUuid;
           let { bidLimit } = req.body;
