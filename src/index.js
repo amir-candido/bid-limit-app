@@ -11,6 +11,7 @@ const { createLimitsService } = require('./api'); // ensure this module exports 
 const { patchRegistrant } = require('./bidjs-rest');
 const { enqueueSuspensionRetry } = require('./services/enqueueSuspensionRetry');
 const { createRecordAudit } = require('./services/audit');
+const { syncAuctions } = require('./services/syncAuctions');
 
 const app = express(); // MUST be created before any app.use
 
@@ -28,8 +29,7 @@ const limitsSvc = createLimitsService({
   logger: console
 });
 const limitsRouter = limitsSvc.router;
-// If you need ensureBidLimitCached exported, use limitsSvc.ensureBidLimitCached
-const ensureBidLimitCachedFromLimitsService = limitsSvc.ensureBidLimitCached;
+
 
 // configure webhook verifier
 const wh = new Webhook(SVIX_WEBHOOK_SECRET);
@@ -57,6 +57,22 @@ morgan.token('req-body', (req) => {
   }
 });
 app.use(morgan(':method :url :status :response-time ms - Body: :req-body - Headers: :req[header]'));
+
+(async () => {
+  try {
+    // 1) Ensure auctions are seeded before serving traffic
+    await syncAuctions({ db });
+
+    // 2) Start server after auctions synced
+    app.listen(PORT, () => {
+      console.log(`Admin API listening on port ${PORT}`);
+      startBidJsSocket();
+    });
+  } catch (err) {
+    console.error('Startup failed, exiting:', err);
+    process.exit(1);
+  }
+})();
 
 
 // Webhook endpoint (raw body preserved for signature verification)

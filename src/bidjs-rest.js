@@ -28,10 +28,17 @@ async function fetchActiveAuctions() {
 
 async function fetchAllAuctions() {
   try {
-    const { data } = await bidjsClient.get(`${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`);
+
+    console.log("Running fetchAllAuctions...");
+
+    const url = `${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`;
+
+    console.log("url:", url);
+
+    const { data } = await bidjsClient.get( `${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}` );
     return data.models?.auctionReferenceModel?.collection || [];
   } catch (err) {
-    console.error('getAllAuctions.js fetchAllAuctions: Failed to fetch auctions:', err.message);
+    console.error('fetchAllAuctions: Failed to fetch auctions:', err.message);
     return [];
   }
 }
