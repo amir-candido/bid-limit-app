@@ -136,6 +136,8 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
 // JSON body parser for normal routes (webhook uses express.raw below)
 app.use(express.json());
 
+console.log("Session secret:", SESSION_SECRET);
+
 const authSvc = createAuthService({
   db,
   SESSION_SECRET,
