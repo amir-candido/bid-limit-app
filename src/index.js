@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const { Webhook } = require('svix');
-const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, SVIX_WEBHOOK_SECRET } = require('./config');
+const { PORT, CORS_ORIGIN_PRODUCTION, CORS_ORIGIN_LOCAL, SVIX_WEBHOOK_SECRET, SESSION_SECRET } = require('./config');
 const { startBidJsSocket } = require('./bidjsSocket');
 const { db } = require('./db');
 const { redis } = require('./redis');
@@ -12,7 +12,7 @@ const { patchRegistrant } = require('./bidjs-rest');
 const { enqueueSuspensionRetry } = require('./services/enqueueSuspensionRetry');
 const { createRecordAudit } = require('./services/audit');
 const { syncAuctions } = require('./services/syncAuctions');
-
+const createAuthService = require('./services/createAuthService'); 
 const app = express(); // MUST be created before any app.use
 
 // create audit service
@@ -73,7 +73,6 @@ app.use(morgan(':method :url :status :response-time ms - Body: :req-body - Heade
     process.exit(1);
   }
 })();
-
 
 // Webhook endpoint (raw body preserved for signature verification)
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -137,7 +136,23 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
 // JSON body parser for normal routes (webhook uses express.raw below)
 app.use(express.json());
 
-app.use('/admin', limitsRouter);
+const authSvc = createAuthService({
+  db,
+  SESSION_SECRET,
+  cookieOpts: { secure: process.env.NODE_ENV === 'production' },
+  logger: console
+});
+
+app.use(authSvc.sessionMiddleware);
+
+// attach user convenience middleware (optional)
+app.use(authSvc.attachUser);
+
+// mount auth routes
+app.use('/auth', authSvc.router);
+
+// protect admin routes: require auth for the admin UI & APIs
+app.use('/admin', authSvc.requireAuth, limitsRouter);
 
 // start server after all routes/middleware registered
 app.listen(PORT, () => {

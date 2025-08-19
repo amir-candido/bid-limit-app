@@ -16,6 +16,6 @@ module.exports = {
   DB_PASSWORD: process.env.DB_PASSWORD,
   DB_USER: process.env.DB_USER,
   REDIS_HOST: process.env.REDIS_HOST,
-  REDIS_PORT: process.env.REDIS_PORT
-
+  REDIS_PORT: process.env.REDIS_PORT,
+  SESSION_SECRET: process.env.SESSION_SECRET
 };
