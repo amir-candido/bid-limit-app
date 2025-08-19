@@ -142,6 +142,18 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
         // -------------------------
         const router = express.Router();
 
+        router.get('/auctions', async (req, res) => {
+          try {
+            const [rows] = await db.execute(`SELECT auctionUuid, title FROM auctions ORDER BY createdAt DESC`);
+            // Return array of { auctionUuid, title }
+            const out = rows.map(r => ({ auctionUuid: r.auctionUuid, title: r.title }));
+            return res.json(out);
+          } catch (err) {
+            logger.error('GET /auctions failed:', err);
+            return res.status(500).json({ error: 'internal_error' });
+          }
+        });        
+
         // GET /admin/:auctionUuid/registrants
         // Query: ?q=&page=&pageSize=&sort=
         router.get('/:auctionUuid/registrants', async (req, res) => {

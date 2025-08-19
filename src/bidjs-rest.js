@@ -28,13 +28,6 @@ async function fetchActiveAuctions() {
 
 async function fetchAllAuctions() {
   try {
-
-    console.log("Running fetchAllAuctions...");
-
-    const url = `${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}`;
-
-    console.log("url:", url);
-
     const { data } = await bidjsClient.get( `${BIDJS_BASE}/auction-mgt/bdxapi/auctions/${Auctioneer_ID}?clientId=${Client_ID}` );
     return data.models?.auctionReferenceModel?.collection || [];
   } catch (err) {
