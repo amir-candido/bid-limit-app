@@ -1,6 +1,6 @@
 // scripts/seed-user.js
 const bcrypt = require('bcrypt');
-const { db } = require('../src/db'); // adapt path if different
+const { db } = require('../db'); // adapt path if different
 
 async function run() {
   const email = process.argv[2];
@@ -13,7 +13,7 @@ async function run() {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const sql = `INSERT INTO users (email, passwordHash) VALUES (?, ?, ?)`;
+  const sql = `INSERT INTO users (email, passwordHash) VALUES (?, ?)`;
   try {
     await db.execute(sql, [email, passwordHash]);
     console.log('User created:', { email });
