@@ -44,6 +44,7 @@ app.use(cors({
     console.warn(`🚫 Blocked CORS request from: ${origin}`);
     cb(new Error(`Origin ${origin} not allowed by CORS`));
   },
+  credentials: true,
   methods: ['GET','POST','PATCH','OPTIONS']
 }));
 
