@@ -101,7 +101,7 @@ module.exports = function createAuthService({ db, sessionSecret, cookieOpts = {}
     try {
       // Find user by email
       const [rows] = await db.execute(
-        'SELECT id, userUuid, email, passwordHash, role FROM users WHERE email = ? LIMIT 1',
+        'SELECT id, email, passwordHash, role FROM users WHERE email = ? LIMIT 1',
         [String(email).toLowerCase()]
       );
 
@@ -118,7 +118,6 @@ module.exports = function createAuthService({ db, sessionSecret, cookieOpts = {}
       // Store minimal user info in session (avoid storing sensitive data)
       req.session.user = {
         id: user.id,
-        userUuid: user.userUuid,
         email: user.email,
         role: user.role || 'admin'
       };
