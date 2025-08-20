@@ -13,6 +13,7 @@ const { enqueueSuspensionRetry } = require('./services/enqueueSuspensionRetry');
 const { createRecordAudit } = require('./services/audit');
 const { syncAuctions } = require('./services/syncAuctions');
 const createAuthService = require('./services/createAuthService'); 
+const sessionSecret = "c0Uk3£WFP7z8W{XAI4etl";
 const app = express(); // MUST be created before any app.use
 
 // create audit service
@@ -136,11 +137,9 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
 // JSON body parser for normal routes (webhook uses express.raw below)
 app.use(express.json());
 
-console.log("Session secret:", SESSION_SECRET);
-
 const authSvc = createAuthService({
   db,
-  SESSION_SECRET,
+  sessionSecret,
   cookieOpts: { secure: process.env.NODE_ENV === 'production' },
   logger: console
 });
