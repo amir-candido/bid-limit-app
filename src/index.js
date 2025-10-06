@@ -60,21 +60,7 @@ morgan.token('req-body', (req) => {
 });
 app.use(morgan(':method :url :status :response-time ms - Body: :req-body - Headers: :req[header]'));
 
-(async () => {
-  try {
-    // 1) Ensure auctions are seeded before serving traffic
-    await syncAuctions({ db });
 
-    // 2) Start server after auctions synced
-    app.listen(PORT, () => {
-      console.log(`Admin API listening on port ${PORT}`);
-      startBidJsSocket();
-    });
-  } catch (err) {
-    console.error('Startup failed, exiting:', err);
-    process.exit(1);
-  }
-})();
 
 // Webhook endpoint (raw body preserved for signature verification)
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -151,16 +137,10 @@ app.use(authSvc.sessionMiddleware);
 app.use(authSvc.attachUser);
 
 // mount auth routes
-app.use('/auth', authSvc.router);
+//app.use('/auth', authSvc.router);
 
-// protect admin routes: require auth for the admin UI & APIs
-app.use('/admin', authSvc.requireAuth, limitsRouter);
+app.use('/api', limitsRouter);
 
-// start server after all routes/middleware registered
-app.listen(PORT, () => {
-  console.log(`Admin API listening on port ${PORT}`);
-  startBidJsSocket();
-});
 
 // graceful shutdown & error handling hooks (recommended)
 process.on('unhandledRejection', (err) => {
@@ -172,3 +152,18 @@ process.on('SIGINT', async () => {
   try { await db.end(); } catch (e) {}
   process.exit(0);
 });
+
+// start server after all routes/middleware registered
+(async () => {
+  try {
+    await syncAuctions({ db });
+
+    app.listen(PORT, () => {
+      console.log(`Admin API listening on port ${PORT}`);
+      startBidJsSocket();
+    });
+  } catch (err) {
+    console.error('Startup failed, exiting:', err);
+    process.exit(1);
+  }
+})();
