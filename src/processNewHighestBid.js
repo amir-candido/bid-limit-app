@@ -88,88 +88,111 @@ async function processNewHighestBid(opts) {
           return { status: 'NO_ACTION' };
         }
 
-        const status = res[0];
+        const status             = res[0];
+        const newActiveCountStr  = res[1] || '0';
+        const newUserUuid        = res[2] || opts.newUserUuid;  // sanity fallback
+        const lUuid              = res[3] || opts.listingUuid;
+        const oldUserUuid        = res[4] || null;
+        const oldActiveCountStr  = res[5] || '0';
+        const newRegistrantUuid  = res[6] || null;
+        const oldRegistrantUuid  = res[7] || null;
+
+        const newActiveCount = Number(newActiveCountStr || 0);
+        const oldActiveCount = Number(oldActiveCountStr || 0);
+
+        const bidLimitHashKey   = `auction:${auctionUuid}:userBidLimit`;
+        const awaitingKeyNew    = `auction:${auctionUuid}:userAwaitingDeposit:${newUserUuid}`;
+        const awaitingKeyOld    = oldUserUuid ? `auction:${auctionUuid}:userAwaitingDeposit:${oldUserUuid}` : null;
+        const suspendedSetKey   = `auction:${auctionUuid}:suspendedUsers`;
+
+        async function maybeUnsuspend(usrUuid, regUuid, activeCount) {
+          if (!usrUuid) return;
+          try {
+            const [awaitFlag, limitStr] = await Promise.all([
+              redis.get(`auction:${auctionUuid}:userAwaitingDeposit:${usrUuid}`).catch(() => null),
+              redis.hget(bidLimitHashKey, usrUuid).catch(() => null)
+            ]);
+            if (!awaitFlag) return;
+
+            const limit = (limitStr === null || limitStr === '') ? null : Number(limitStr);
+            const within = (limit === null) ? true : (activeCount < limit);
+            if (!within) return;
+
+            // resolve registrant if not provided
+            let registrantUuid = regUuid;
+            if (!registrantUuid) {
+              registrantUuid = await redis.hget(`auction:${auctionUuid}:userToRegistrant`, usrUuid).catch(() => null);
+              if (!registrantUuid) {
+                const [rows] = await db.execute(
+                  `SELECT registrantUuid FROM registrants WHERE auctionUuid=? AND userUuid=? LIMIT 1`,
+                  [auctionUuid, usrUuid]
+                );
+                registrantUuid = rows?.[0]?.registrantUuid || null;
+              }
+            }
+            if (!registrantUuid) return;
+
+            try {
+              await patchRegistrant(auctionUuid, registrantUuid, 'APPROVED');
+              await redis.del(`auction:${auctionUuid}:userAwaitingDeposit:${usrUuid}`);
+              await redis.srem(suspendedSetKey, usrUuid);
+              // optional: audit
+            } catch (e) {
+              await enqueueSuspensionRetry?.({ type:'unsuspend', auctionUuid, userUuid: usrUuid, registrantUuid, err:String(e) });
+            }
+          } catch (e) {
+            // log and continue
+            console.warn('maybeUnsuspend error', e && e.message || e);
+          }
+        }
 
         if (status === 'NOOP' || status === 'OK') {
-          // normal path, nothing further
-          return { status: 'OK', count: res[1] || null };
+          // On any successful swap, try unsuspend the previous user if needed
+          if (oldUserUuid) {
+            await maybeUnsuspend(oldUserUuid, oldRegistrantUuid, oldActiveCount);
+          }
+          return { status, count: newActiveCount };
         }
 
-        // handle ATLIMIT (the bidder has just reached their allowed count)
         if (status === 'ATLIMIT') {
-          const activeCountStr = res[1] || '0';
-          const registrantUuidFromCache = res[2] || '';
-          const activeCount = Number(activeCountStr);
+          // suspend new user if not already flagged
+          const alreadyFlag = await redis.get(awaitingKeyNew);
+          if (!alreadyFlag) {
+            const registrantUuid = newRegistrantUuid ||
+              await redis.hget(`auction:${auctionUuid}:userToRegistrant`, newUserUuid) ||
+              (await (async () => {
+                const [rows] = await db.execute(
+                  `SELECT registrantUuid FROM registrants WHERE auctionUuid=? AND userUuid=? LIMIT 1`,
+                  [auctionUuid, newUserUuid]
+                );
+                return rows?.[0]?.registrantUuid || null;
+              })());
 
-          // Resolve registrantUuid if missing
-          let registrantUuid = registrantUuidFromCache || null;
-          if (!registrantUuid) {
-            try {
-              registrantUuid = await redis.hget(userToRegistrantHash, newUserUuid);
-            } catch (err) {
-              console.warn('Redis failed to HGET userToRegistrant, will fall back to DB', err);
+            if (registrantUuid) {
+              try {
+                await patchRegistrant(auctionUuid, registrantUuid, 'AWAITING_DEPOSIT');
+                await redis.set(awaitingKeyNew, '1');
+                await redis.sadd(suspendedSetKey, newUserUuid);
+              } catch (e) {
+                await enqueueSuspensionRetry?.({ type:'awaitingDeposit', auctionUuid, newUserUuid, registrantUuid, bidUuid, attempts:0, lastError:String(e) });
+              }
             }
           }
-
-          if (!registrantUuid) {
-            try {
-              const [rows] = await db.execute(
-                `SELECT registrantUuid FROM registrants WHERE auctionUuid = ? AND userUuid = ?`,
-                [auctionUuid, newUserUuid]
-              );
-              registrantUuid = rows && rows[0] && rows[0].registrantUuid;
-            } catch (err) {
-              console.error('DB lookup for registrantUuid failed', err);
-            }
+          // also attempt unsuspend the old user on this swap
+          if (oldUserUuid) {
+            await maybeUnsuspend(oldUserUuid, oldRegistrantUuid, oldActiveCount);
           }
-
-          if (!registrantUuid) {
-            console.error('Unable to resolve registrantUuid for user', { auctionUuid, userUuid: newUserUuid });
-            // Optionally enqueue an audit record for manual review
-            await enqueueSuspensionRetry?.({ type: 'missingRegistrant', auctionUuid, userUuid: newUserUuid, bidUuid });
-            return { status: 'NO_REGISTRANT' };
-          }
-
-          // Check "already awaiting deposit" flag to avoid duplicate PATCHes
-          const awaitingFlagKey   = `auction:${auctionUuid}:userAwaitingDeposit:${newUserUuid}`;
-          const alreadyFlag       = await redis.get(awaitingFlagKey);
-          if (alreadyFlag) {
-            console.log('Registrant already marked awaiting deposit; skipping', { auctionUuid, registrantUuid, newUserUuid });
-            // Optionally record audit
-            return { status: 'ALREADY_FLAGGED' };
-          }
-
-          // Call BidJS to set status to AWATING_DEPOSIT
-          try {
-            // patchRegistrant must accept (auctionUuid, registrantUuid, status). 
-            // To see how "AWAITING DEPOSIT" is set, see route '/:auctionUuid/registrants/:userUuid/limit' in ./api
-            const apiRes = await patchRegistrant(auctionUuid, registrantUuid, 'AWAITING_DEPOSIT');
-            // Mark flag and write audit row
-            await redis.set(awaitingFlagKey, '1'); // no TTL: persists until cleared by unsuspend logic
-            //await recordSuspensionAudit?.(auctionUuid, newUserUuid, registrantUuid, 'awaiting_deposit', 'system', { apiResponse: apiRes });
-            console.log('Marked registrant awaiting deposit', { auctionUuid, registrantUuid, newUserUuid, activeCount });
-            await redis.sadd(`auction:${auctionUuid}:suspendedUsers`, newUserUuid);
-            return { status: 'ATLIMIT_ACTION_TAKEN', activeCount };
-          } catch (err) {
-            console.error('patchRegistrant failed; enqueuing retry', err);
-            console.error(`Failed to suspend bidder: auction=${auctionUuid}, user=${newUserUuid}`, err);
-            await enqueueSuspensionRetry?.({ type: 'awaitingDeposit', auctionUuid, newUserUuid, registrantUuid, bidUuid, attempts: 0, lastError: String(err) });
-            //await recordSuspensionAudit?.(auctionUuid, newUserUuid, registrantUuid, 'awaiting_deposit_failed', 'system', { error: String(err) });
-            return { status: 'ENQUEUE_RETRY' };
-          }
+          return { status:'ATLIMIT_ACTION_TAKEN', activeCount: newActiveCount };
         }
 
-        // if script returned other signals (EXCEEDED), handle them sensibly (treat as exceeded)
         if (status === 'EXCEEDED') {
-          // fallback behavior: treat similarly to ATLIMIT but script logic should avoid this generally
-          console.warn('Lua returned EXCEEDED for bid — this should be rare. Consider reviewing Lua logic.', { auctionUuid, listingUuid, bidUuid, res });
-          // For safety, we won't call patchRegistrant here automatically; instead enqueue for manual review
-          await enqueueSuspensionRetry?.({ type: 'exceededManual', auctionUuid, listingUuid, newUserUuid, bidUuid, detail: res });
-          return { status: 'EXCEEDED_ENQUEUED' };
+          // nothing committed; optional audit/enqueue
+          await enqueueSuspensionRetry?.({ type:'exceededManual', auctionUuid, listingUuid, newUserUuid, bidUuid, detail: res });
+          return { status:'EXCEEDED_ENQUEUED' };
         }
 
-        // default
-        return { status: 'NO_ACTION' };
+        return { status:'NO_ACTION' };
+
 }
 
 
