@@ -12,12 +12,15 @@ CREATE TABLE IF NOT EXISTS registrants (
     registrantUuid CHAR(36) NOT NULL,
     userUuid CHAR(36) NOT NULL,
     fullName VARCHAR(100) DEFAULT NULL,
+    email VARCHAR(255) DEFAULT NULL,
     bidLimit BIGINT DEFAULT NULL,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uniq_auction_user (auctionUuid, userUuid)
+    UNIQUE KEY uniq_auction_user (auctionUuid, userUuid),
+    KEY idx_registrants_auction_email (auctionUuid, email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- Auctions table (optional for metadata; helps with joins later)
 CREATE TABLE IF NOT EXISTS auctions (

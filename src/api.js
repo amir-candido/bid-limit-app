@@ -165,7 +165,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
 
           try {
             // basic search by name or userUuid
-            let sql = `SELECT userUuid, registrantUuid, fullName, bidLimit FROM registrants WHERE auctionUuid = ?`;
+            let sql = `SELECT userUuid, registrantUuid, fullName, email, bidLimit FROM registrants WHERE auctionUuid = ?`;
             const params = [auctionUuid];
             if (q) {
               sql += ` AND (fullName LIKE ? OR userUuid = ? OR registrantUuid = ?)`;
@@ -194,6 +194,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
                 userUuid: r.userUuid,
                 registrantUuid: r.registrantUuid,
                 fullName: r.fullName,
+                email: r.email,
                 bidLimit: r.bidLimit === null ? null : Number(r.bidLimit),
                 activeCount: live.activeCount,
                 awaitingDeposit: !!live.awaitingFlag,
@@ -215,7 +216,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
 
           try {
             const [rows] = await db.execute(
-              `SELECT userUuid, registrantUuid, fullName, bidLimit FROM registrants WHERE auctionUuid = ? AND userUuid = ? LIMIT 1`,
+              `SELECT userUuid, registrantUuid, fullName, email, bidLimit FROM registrants WHERE auctionUuid = ? AND userUuid = ? LIMIT 1`,
               [auctionUuid, userUuid]
             );
             if (!rows || rows.length === 0) return res.status(404).json({ error: 'not_found' });
@@ -233,6 +234,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
               userUuid: r.userUuid,
               registrantUuid: r.registrantUuid,
               fullName: r.fullName,
+              email: r.email,
               bidLimit: r.bidLimit === null ? null : Number(r.bidLimit),
               activeCount: Number(activeCount || 0),
               awaitingDeposit: !!awaitingFlag,

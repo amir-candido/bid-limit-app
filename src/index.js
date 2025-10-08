@@ -80,7 +80,10 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
   }
 
   try {
-    const { auctionUuid, registrantUuid, userUuid, fullName } = evt;
+      const data = evt.data || evt; // Svix usually puts fields in evt.data
+      const { auctionUuid, registrantUuid, userUuid, fullName } = data || {};
+      // Try to find an email regardless of exact payload shape:
+      const email = data?.email || data?.user?.email || data?.registrant?.email || null;
     if (!auctionUuid || !registrantUuid || !userUuid) {
       console.warn('Webhook missing required fields:', { auctionUuid, registrantUuid, userUuid });
       return res.status(400).json({ error: 'Missing required fields' });
@@ -89,13 +92,14 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     // 1) Upsert into DB (authoritative)
     const sql = `
       INSERT INTO registrants
-        (auctionUuid, registrantUuid, userUuid, fullName)
-      VALUES (?, ?, ?, ?)
+        (auctionUuid, registrantUuid, userUuid, fullName, email)
+      VALUES (?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         fullName = VALUES(fullName),
-        updatedAt = CURRENT_TIMESTAMP
-    `;
-    const [result] = await db.query(sql, [auctionUuid, registrantUuid, userUuid, fullName]);
+        email = COALESCE(VALUES(email), email),
+        updatedAt = CURRENT_TIMESTAMP`;
+    const params = [auctionUuid, registrantUuid, userUuid, fullName, email];
+    const [result] = await db.query(sql, params);
     console.log(`MySQL upsert: affected=${result.affectedRows}, changed=${result.changedRows}`);
 
     // 2) Update Redis cache (best-effort)
@@ -104,6 +108,7 @@ app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req
     await redis.hset(registrantHashKey, {
       userUuid,
       fullName: fullName || '',
+      email: email || '',
       bidLimit: '' // empty string denotes unlimited
     });
     // Use canonical key name for bid limits
