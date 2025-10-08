@@ -134,10 +134,16 @@ function startBidJsSocket(options = {}) {
         }
 
         // Start first connection
-        connect().catch(err => {
-          console.error('Initial WS connect failed:', err);
-          scheduleReconnect();
-        });
+        let isConnecting = false;
+        async function connect() {
+          if (isConnecting) return;
+          isConnecting = true;
+          try {
+            scheduleReconnect();
+          } finally {
+            isConnecting = false;
+          }
+        }
 }
 
 module.exports = { startBidJsSocket };
