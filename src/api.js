@@ -209,7 +209,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
         });
 
         // GET single registrant
-        router.get('/:auctionUuid/registrants/:userUuid', async (req, res) => {
+        router.get('/auctions/:auctionUuid/registrants/:userUuid', async (req, res) => {
           const auctionUuid = req.params.auctionUuid;
           const userUuid = req.params.userUuid;
 
@@ -246,31 +246,31 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
 
         // PATCH limit - update DB then write-through to Redis; optional enforce param: ?enforce=true
         router.patch('/auctions/:auctionUuid/registrants/:registrantUuid', async (req, res) => {
-          const auctionUuid = req.params.auctionUuid;
-          const userUuid = req.params.userUuid;
+
+          const { auctionUuid, registrantUuid } = req.params;
           let { bidLimit } = req.body;
           const enforce = req.query.enforce === 'true';
           const adminUser = (req.user && req.user.username) ? req.user.username : 'admin'; // ensure you have auth middleware
 
-          // normalize input
+          // normalize bidLimit
           if (bidLimit === '') bidLimit = null;
           if (bidLimit != null && typeof bidLimit !== 'number') {
-            // Try parse numeric strings
             const n = Number(bidLimit);
             if (Number.isNaN(n)) return res.status(400).json({ error: 'invalid_bidLimit' });
             bidLimit = n;
           }
-
           if (bidLimit != null && bidLimit < 0) return res.status(400).json({ error: 'bidLimit_must_be_non_negative' });
 
+
           try {
-            // 1) ensure registrant exists
+            // lookup by registrantUuid (correct)
             const [rows] = await db.execute(
-              `SELECT registrantUuid, bidLimit as oldBidLimit FROM registrants WHERE auctionUuid = ? AND userUuid = ? LIMIT 1`,
-              [auctionUuid, userUuid]
+              `SELECT userUuid, bidLimit AS oldBidLimit FROM registrants WHERE auctionUuid=? AND registrantUuid=? LIMIT 1`,
+              [auctionUuid, registrantUuid]
             );
             if (!rows || rows.length === 0) return res.status(404).json({ error: 'registrant_not_found' });
-            const registrantUuid = rows[0].registrantUuid;
+
+            const userUuid = rows[0].userUuid;
             const oldBidLimit = rows[0].oldBidLimit === null ? null : Number(rows[0].oldBidLimit);
 
             // 2) Update DB (durable)
