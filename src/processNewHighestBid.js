@@ -45,7 +45,7 @@ async function processNewHighestBid(opts) {
         const userToRegistrantHash    = `auction:${auctionUuid}:userToRegistrant`;
 
         // 0) Deduplicate by bidUuid
-        const processedKey = `processedBid:${bidUuid}`;
+        const processedKey = `auction:${auctionUuid}:processedBid:${bidUuid}`;
         try {
           // Redis SET NX returns 'OK' when set, null if already exists
           const got = await redis.set(processedKey, '1', 'NX', 'EX', 300);
@@ -90,7 +90,7 @@ async function processNewHighestBid(opts) {
 
         const status             = res[0];
         const newActiveCountStr  = res[1] || '0';
-        const newUserUuid        = res[2] || opts.newUserUuid;  // sanity fallback
+        const winnerUserUuid     = res[2] || opts.newUserUuid;  // sanity fallback
         const lUuid              = res[3] || opts.listingUuid;
         const oldUserUuid        = res[4] || null;
         const oldActiveCountStr  = res[5] || '0';
@@ -101,8 +101,8 @@ async function processNewHighestBid(opts) {
         const oldActiveCount = Number(oldActiveCountStr || 0);
 
         const bidLimitHashKey   = `auction:${auctionUuid}:userBidLimit`;
-        const awaitingKeyNew    = `auction:${auctionUuid}:userAwaitingDeposit:${newUserUuid}`;
-        const awaitingKeyOld    = oldUserUuid ? `auction:${auctionUuid}:userAwaitingDeposit:${oldUserUuid}` : null;
+        const awaitingKeyNew    = `auction:${auctionUuid}:userAwaitingDeposit:${winnerUserUuid}`;
+       // const awaitingKeyOld    = oldUserUuid ? `auction:${auctionUuid}:userAwaitingDeposit:${oldUserUuid}` : null;
         const suspendedSetKey   = `auction:${auctionUuid}:suspendedUsers`;
 
         async function maybeUnsuspend(usrUuid, regUuid, activeCount) {
@@ -159,11 +159,11 @@ async function processNewHighestBid(opts) {
           const alreadyFlag = await redis.get(awaitingKeyNew);
           if (!alreadyFlag) {
             const registrantUuid = newRegistrantUuid ||
-              await redis.hget(`auction:${auctionUuid}:userToRegistrant`, newUserUuid) ||
+              await redis.hget(`auction:${auctionUuid}:userToRegistrant`, winnerUserUuid) ||
               (await (async () => {
                 const [rows] = await db.execute(
                   `SELECT registrantUuid FROM registrants WHERE auctionUuid=? AND userUuid=? LIMIT 1`,
-                  [auctionUuid, newUserUuid]
+                  [auctionUuid, winnerUserUuid]
                 );
                 return rows?.[0]?.registrantUuid || null;
               })());
@@ -172,9 +172,9 @@ async function processNewHighestBid(opts) {
               try {
                 await patchRegistrant(auctionUuid, registrantUuid, 'AWAITING_DEPOSIT');
                 await redis.set(awaitingKeyNew, '1');
-                await redis.sadd(suspendedSetKey, newUserUuid);
+                await redis.sadd(suspendedSetKey, winnerUserUuid);
               } catch (e) {
-                await enqueueSuspensionRetry?.({ type:'awaitingDeposit', auctionUuid, newUserUuid, registrantUuid, bidUuid, attempts:0, lastError:String(e) });
+                await enqueueSuspensionRetry?.({ type:'awaitingDeposit', auctionUuid, newUserUuid: winnerUserUuid, registrantUuid, bidUuid, attempts:0, lastError:String(e) });
               }
             }
           }
