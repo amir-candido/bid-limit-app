@@ -152,7 +152,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
             logger.error('GET /auctions failed:', err);
             return res.status(500).json({ error: 'internal_error' });
           }
-        });        
+        });
 
         // GET /admin/:auctionUuid/registrants
         // Query: ?q=&page=&pageSize=&sort=
@@ -174,6 +174,8 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
               where += ` AND (fullName LIKE ? OR email LIKE ? OR userUuid = ? OR registrantUuid = ?)`;
               params.push(`%${q}%`, `%${q}%`, q, q);
             }
+
+            console.log('GET registrants', { auctionUuid, q, page, pageSize });
 
             // 1) total count
             const [countRows] = await db.execute(
