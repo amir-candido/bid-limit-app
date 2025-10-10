@@ -159,23 +159,43 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
         router.get('/auctions/:auctionUuid/registrants', async (req, res) => {
           const auctionUuid = req.params.auctionUuid;
           const q = req.query.q ? String(req.query.q).trim() : null;
+
+          // clamp page & size
           const pageSize = Math.min(200, Math.max(10, Number(req.query.pageSize) || 50));
           const page = Math.max(1, Number(req.query.page) || 1);
           const offset = (page - 1) * pageSize;
 
           try {
-            // basic search by name or userUuid
-            let sql = `SELECT userUuid, registrantUuid, fullName, email, bidLimit FROM registrants WHERE auctionUuid = ?`;
+            // --- WHERE clause & params reused for both COUNT and SELECT ---
+            let where = `WHERE auctionUuid = ?`;
             const params = [auctionUuid];
+
             if (q) {
-              sql += ` AND (fullName LIKE ? OR userUuid = ? OR registrantUuid = ?)`;
-              params.push(`%${q}%`, q, q);
+              where += ` AND (fullName LIKE ? OR email LIKE ? OR userUuid = ? OR registrantUuid = ?)`;
+              params.push(`%${q}%`, `%${q}%`, q, q);
             }
-            sql += ` ORDER BY fullName ASC LIMIT ${pageSize} OFFSET ${offset}`;
 
-            const [rows] = await db.execute(sql, params);
+            // 1) total count
+            const [countRows] = await db.execute(
+              `SELECT COUNT(*) AS total FROM registrants ${where}`,
+              params
+            );
+            const total = Number(countRows?.[0]?.total || 0);
+            const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
-            // prepare list of userUuids for batch Redis lookups
+            // 2) page of data
+            const [rows] = await db.execute(
+              `
+              SELECT userUuid, registrantUuid, fullName, email, bidLimit
+              FROM registrants
+              ${where}
+              ORDER BY fullName ASC
+              LIMIT ${pageSize} OFFSET ${offset}
+              `,
+              params
+            );
+
+            // 3) live fields from Redis in batch
             const userUuids = rows.map(r => r.userUuid);
             let liveMap = {};
             if (userUuids.length) {
@@ -187,7 +207,7 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
               }
             }
 
-            // format response
+            // 4) shape response
             const data = rows.map((r) => {
               const live = liveMap[r.userUuid] || { activeCount: 0, awaitingFlag: false, cachedLimit: null };
               return {
@@ -198,16 +218,17 @@ function createLimitsService({ db, redis, patchRegistrant, enqueueSuspensionRetr
                 bidLimit: r.bidLimit === null ? null : Number(r.bidLimit),
                 activeCount: live.activeCount,
                 awaitingDeposit: !!live.awaitingFlag,
-                cachedLimit: live.cachedLimit // string or null
+                cachedLimit: live.cachedLimit
               };
             });
 
-            res.json({ page, pageSize, data });
+            return res.json({ page, pageSize, total, pageCount, data });
           } catch (err) {
             logger.error('GET registrants failed:', err);
-            res.status(500).json({ error: 'internal_error' });
+            return res.status(500).json({ error: 'internal_error' });
           }
         });
+
 
         // GET single registrant
         router.get('/auctions/:auctionUuid/registrants/:userUuid', async (req, res) => {

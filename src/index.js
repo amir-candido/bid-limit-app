@@ -62,7 +62,7 @@ app.use(morgan(':method :url :status :response-time ms - Body: :req-body - Heade
 
 
 
-// Webhook endpoint (raw body preserved for signature verification)
+// Saves to DB when user registers for an auction.
 app.post('/bidjs/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const payload = req.body; // Buffer
   const headers = req.headers;
